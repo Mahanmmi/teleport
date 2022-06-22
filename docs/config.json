@@ -298,6 +298,10 @@
             {
               "title": "teleport-plugin-event-handler",
               "slug": "/setup/helm-reference/teleport-plugin-event-handler/"
+            },
+            {
+              "title": "teleport-plugin-jira",
+              "slug": "/setup/helm-reference/teleport-plugin-jira/"
             }
           ]
         }
