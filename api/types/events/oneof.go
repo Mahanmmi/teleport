@@ -407,6 +407,10 @@ func ToOneOf(in AuditEvent) (*OneOf, error) {
 		out.Event = &OneOf_UpgradeWindowStartUpdate{
 			UpgradeWindowStartUpdate: e,
 		}
+	case *SSMRun:
+		out.Event = &OneOf_SSMRun{
+			SSMRun: e,
+		}
 	case *Unknown:
 		out.Event = &OneOf_Unknown{
 			Unknown: e,
