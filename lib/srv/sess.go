@@ -19,8 +19,10 @@ package srv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/user"
 	"path/filepath"
 	"sync"
@@ -261,6 +263,10 @@ func (s *SessionRegistry) OpenSession(ctx context.Context, ch ssh.Channel, scx *
 	if err != nil {
 		return trace.Wrap(err)
 	}
+
+	if err := sess.auditd.SendLogin(); err != nil {
+		return trace.Wrap(err)
+	}
 	// Start an interactive session (TTY attached). Close the session if an error
 	// occurs, otherwise it will be closed by the callee.
 	if err := sess.startInteractive(ctx, ch, scx, tempUser); err != nil {
@@ -299,6 +305,10 @@ func (s *SessionRegistry) OpenExecSession(ctx context.Context, channel ssh.Chann
 
 	tempUser, err := s.tryCreateHostUser(scx)
 	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	if err := sess.auditd.SendLogin(); err != nil {
 		return trace.Wrap(err)
 	}
 
@@ -496,6 +506,9 @@ type session struct {
 
 	// serverMeta contains metadata about the target node of this session.
 	serverMeta apievents.ServerMetadata
+
+	//
+	auditd *AuditDClient
 }
 
 // newSession creates a new session with a given ID within a given context.
@@ -556,6 +569,16 @@ func newSession(ctx context.Context, id rsession.ID, r *SessionRegistry, scx *Se
 
 	policySets := scx.Identity.AccessChecker.SessionPolicySets()
 
+	log.Warnf("creating auditd client")
+	auditdClient, err := NewAuditDClient()
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			log.Warnf("no permissiont to run auditd")
+		} else {
+			return nil, trace.Wrap(err)
+		}
+	}
+
 	sess := &session{
 		log: log.WithFields(log.Fields{
 			trace.Component: teleport.Component(teleport.ComponentSession, r.Srv.Component()),
@@ -576,6 +599,7 @@ func newSession(ctx context.Context, id rsession.ID, r *SessionRegistry, scx *Se
 		initiator:                      scx.Identity.TeleportUser,
 		displayParticipantRequirements: utils.AsBool(scx.env[teleport.EnvSSHSessionDisplayParticipantRequirements]),
 		serverMeta:                     scx.srv.TargetMetadata(),
+		auditd:                         auditdClient,
 	}
 
 	sess.io.OnWriteError = sess.onWriteError
@@ -665,6 +689,8 @@ func (s *session) Stop() {
 	if err := s.tracker.Close(s.serverCtx); err != nil {
 		s.log.WithError(err).Debug("Failed to close session tracker")
 	}
+
+	s.auditd.Close()
 }
 
 // Close ends the active session and frees all resources. This should only be called
