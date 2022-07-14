@@ -121,13 +121,13 @@ type TestClientConfig struct {
 // MakeTestClientTLSCert returns TLS certificate suitable for configuring test
 // database Postgres/MySQL clients.
 func MakeTestClientTLSCert(config TestClientConfig) (*tls.Certificate, error) {
-	key, err := client.NewKey()
+	key, err := client.GenerateRSAKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	// Generate client certificate for the Teleport user.
 	cert, err := config.AuthServer.GenerateDatabaseTestCert(auth.DatabaseTestCertRequest{
-		PublicKey:       key.Pub,
+		PublicKey:       key.SSHPublicKeyPEM(),
 		Cluster:         config.Cluster,
 		Username:        config.Username,
 		RouteToDatabase: config.RouteToDatabase,
@@ -135,7 +135,7 @@ func MakeTestClientTLSCert(config TestClientConfig) (*tls.Certificate, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	tlsCert, err := tls.X509KeyPair(cert, key.Priv)
+	tlsCert, err := key.TLSCertificate(cert)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

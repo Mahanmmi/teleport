@@ -503,6 +503,7 @@ func (s *Server) AuthenticateSSHUser(ctx context.Context, req AuthenticateSSHReq
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+
 	UserLoginCount.Inc()
 	return &SSHLoginResponse{
 		Username:    username,

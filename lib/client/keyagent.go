@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"crypto/subtle"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -187,10 +186,10 @@ func (a *LocalKeyAgent) UpdateCluster(cluster string) {
 
 // LoadKeyForCluster fetches a cluster-specific SSH key and loads it into the
 // SSH agent.
-func (a *LocalKeyAgent) LoadKeyForCluster(clusterName string) (*agent.AddedKey, error) {
+func (a *LocalKeyAgent) LoadKeyForCluster(clusterName string) error {
 	key, err := a.GetKey(clusterName, WithSSHCerts{})
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return trace.Wrap(err)
 	}
 
 	return a.LoadKey(*key)
@@ -198,24 +197,28 @@ func (a *LocalKeyAgent) LoadKeyForCluster(clusterName string) (*agent.AddedKey, 
 
 // LoadKey adds a key into the Teleport ssh agent as well as the system ssh
 // agent.
-func (a *LocalKeyAgent) LoadKey(key Key) (*agent.AddedKey, error) {
-	a.log.Infof("Loading SSH key for user %q and cluster %q.", a.username, key.ClusterName)
+func (a *LocalKeyAgent) LoadKey(key Key) error {
+	// convert keys into a format understood by the ssh agent
+	agentKeys, err := key.AsAgentKeys()
+	if err != nil {
+		return trace.Wrap(err)
+	}
 
+	if len(agentKeys) == 0 {
+		// key has no agent keys to add to agent, noop
+		return nil
+	}
+
+	a.log.Infof("Loading SSH key for user %q and cluster %q.", a.username, key.ClusterName)
 	agents := []agent.Agent{a.Agent}
 	if a.sshAgent != nil {
 		agents = append(agents, a.sshAgent)
 	}
 
-	// convert keys into a format understood by the ssh agent
-	agentKeys, err := key.AsAgentKeys()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
 	// remove any keys that the user may already have loaded
 	err = a.UnloadKey()
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return trace.Wrap(err)
 	}
 
 	// iterate over all teleport and system agent and load key
@@ -230,7 +233,7 @@ func (a *LocalKeyAgent) LoadKey(key Key) (*agent.AddedKey, error) {
 
 	// return the first key because it has the embedded private key in it.
 	// see docs for AsAgentKeys for more details.
-	return &agentKeys[0], nil
+	return nil
 }
 
 // UnloadKey will unload key for user from the teleport ssh agent as well as
@@ -482,9 +485,9 @@ func (a *LocalKeyAgent) defaultHostPromptFunc(host string, key ssh.PublicKey, wr
 
 // AddKey activates a new signed session key by adding it into the keystore and also
 // by loading it into the SSH agent.
-func (a *LocalKeyAgent) AddKey(key *Key) (*agent.AddedKey, error) {
+func (a *LocalKeyAgent) AddKey(key *Key) error {
 	if err := a.addKey(key); err != nil {
-		return nil, trace.Wrap(err)
+		return trace.Wrap(err)
 	}
 
 	// Load key into the teleport agent and system agent.
@@ -521,7 +524,7 @@ func (a *LocalKeyAgent) addKey(key *Key) error {
 			return trace.Wrap(err)
 		}
 	} else {
-		if subtle.ConstantTimeCompare(storedKey.Priv, key.Priv) == 0 {
+		if !storedKey.Equal(key) {
 			a.log.Debugf("Deleting obsolete stored key with index %+v.", storedKey.KeyIndex)
 			if err := a.keyStore.DeleteKey(storedKey.KeyIndex); err != nil {
 				return trace.Wrap(err)
@@ -589,7 +592,7 @@ func (a *LocalKeyAgent) certsForCluster(clusterName string) ([]ssh.Signer, error
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-		signer, err := k.AsSigner()
+		signer, err := k.SSHSigner()
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}

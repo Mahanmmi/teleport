@@ -1,0 +1,132 @@
+/*
+Copyright 2022 Gravitational, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package keys defines common interfaces for Teleport client keys.
+package keys
+
+import (
+	"crypto"
+	"crypto/tls"
+	"encoding/pem"
+	"os"
+
+	"github.com/gravitational/trace"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+)
+
+const (
+	rsaPrivateKeyType = "RSA PRIVATE KEY"
+)
+
+// PrivateKey implements crypto.PrivateKey and crypto.Signer, with additional helper methods
+// for performing TLS/SSH handshakes, storing agent keys, and storing private key data.
+type PrivateKey interface {
+	crypto.Signer
+
+	// Equal returns whether the given key is equal to this key
+	Equal(x crypto.PrivateKey) bool
+
+	// PrivateKeyDataPEM returns PEM encoded private key data. This may be data necessary
+	// to retrieve the key, such as a Yubikey serial number and slot, or it can be a
+	// full PEM encoded RSA private key.
+	PrivateKeyDataPEM() []byte
+
+	// SSHPublicKey returns the ssh.PublicKey representiation of the public key.
+	SSHPublicKey() ssh.PublicKey
+
+	// TLSCertificate parses the given TLS certificate paired with the private key
+	// to rerturn a tls.Certificate, ready to be used in a TLS handshake.
+	TLSCertificate(tlsCert []byte) (tls.Certificate, error)
+
+	// AsAgentKeys a set of agent keys for the given ssh.Certificate and private key.
+	AsAgentKeys(*ssh.Certificate) []agent.AddedKey
+}
+
+// ParsePrivateKey returns the PrivateKey for the given key PEM block.
+func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
+	block, _ := pem.Decode(keyPEM)
+	if block == nil {
+		return nil, trace.BadParameter("expected PEM encoded private key")
+	}
+
+	switch block.Type {
+	case rsaPrivateKeyType:
+		return parseRSAPrivateKey(block.Bytes)
+	default:
+		return nil, trace.BadParameter("unexpected private key PEM type %q", block.Type)
+	}
+}
+
+// LoadPrivateKey returns the PrivateKey for the given key file.
+func LoadPrivateKey(keyFile string) (PrivateKey, error) {
+	peyPEM, err := os.ReadFile(keyFile)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	priv, err := ParsePrivateKey(peyPEM)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return priv, nil
+}
+
+// GetRSAPrivateKeyPEM returns a PEM encoded RSA private key for the given key.
+// If the given key is not an RSA key, then an error will be returned.
+func GetRSAPrivateKeyPEM(k PrivateKey) ([]byte, error) {
+	if _, ok := k.(*RSAPrivateKey); !ok {
+		return nil, trace.BadParameter("cannot get rsa key PEM for private key of type %T", k)
+	}
+	return k.PrivateKeyDataPEM(), nil
+}
+
+// LoadX509KeyPair parse a tls.Certificate from a private key file and certificate file.
+// This should be used instead of tls.LoadX509KeyPair to support non-raw private keys, like PIV keys.
+func LoadX509KeyPair(certFile, keyFile string) (tls.Certificate, error) {
+	keyPEMBlock, err := os.ReadFile(keyFile)
+	if err != nil {
+		return tls.Certificate{}, trace.Wrap(err)
+	}
+
+	certPEMBlock, err := os.ReadFile(certFile)
+	if err != nil {
+		return tls.Certificate{}, trace.Wrap(err)
+	}
+
+	tlsCert, err := X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		return tls.Certificate{}, trace.Wrap(err)
+	}
+
+	return tlsCert, nil
+}
+
+// X509KeyPair parse a tls.Certificate from a private key PEM and certificate PEM.
+// This should be used instead of tls.X509KeyPair to support non-raw private keys, like PIV keys.
+func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (tls.Certificate, error) {
+	priv, err := ParsePrivateKey(keyPEMBlock)
+	if err != nil {
+		return tls.Certificate{}, trace.Wrap(err)
+	}
+
+	tlsCert, err := priv.TLSCertificate(certPEMBlock)
+	if err != nil {
+		return tls.Certificate{}, trace.Wrap(err)
+	}
+
+	return tlsCert, nil
+}

@@ -33,6 +33,7 @@ import (
 	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/profile"
 	"github.com/gravitational/teleport/api/utils/keypaths"
+	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/sshutils"
 	"github.com/gravitational/teleport/lib/utils"
@@ -132,18 +133,28 @@ func (fs *FSLocalKeyStore) AddKey(key *Key) error {
 	if err := key.KeyIndex.Check(); err != nil {
 		return trace.Wrap(err)
 	}
-	// Store core key data.
-	if err := fs.writeBytes(key.Priv, fs.UserKeyPath(key.KeyIndex)); err != nil {
+
+	if err := fs.writeBytes(key.SSHPublicKeyPEM(), fs.publicKeyPath(key.KeyIndex)); err != nil {
 		return trace.Wrap(err)
 	}
-	if err := fs.writeBytes(key.Pub, fs.sshCAsPath(key.KeyIndex)); err != nil {
+	if err := fs.writeBytes(key.PrivateKeyDataPEM(), fs.UserKeyPath(key.KeyIndex)); err != nil {
 		return trace.Wrap(err)
 	}
+
+	// Store TLS cert
 	if err := fs.writeBytes(key.TLSCert, fs.tlsCertPath(key.KeyIndex)); err != nil {
 		return trace.Wrap(err)
 	}
 	if runtime.GOOS == constants.WindowsOS {
-		if err := fs.writeBytes(key.PPK, fs.PPKFilePath(key.KeyIndex)); err != nil {
+		ppkFile, err := key.PPKFile()
+		if err == nil {
+			if err := fs.writeBytes(ppkFile, fs.PPKFilePath(key.KeyIndex)); err != nil {
+				return trace.Wrap(err)
+			}
+		} else if trace.IsBadParameter(err) {
+			// PPKFile can only be generated from an RSA private key.
+			fs.log.WithError(err).Debugf("Failed to convert private key to PPK-formatted keypair")
+		} else {
 			return trace.Wrap(err)
 		}
 	}
@@ -201,7 +212,7 @@ func (fs *FSLocalKeyStore) writeBytes(bytes []byte, fp string) error {
 func (fs *FSLocalKeyStore) DeleteKey(idx KeyIndex) error {
 	files := []string{
 		fs.UserKeyPath(idx),
-		fs.sshCAsPath(idx),
+		fs.publicKeyPath(idx),
 		fs.tlsCertPath(idx),
 	}
 	for _, fn := range files {
@@ -239,7 +250,6 @@ func (fs *FSLocalKeyStore) DeleteUserCerts(idx KeyIndex, opts ...CertOption) err
 
 // DeleteKeys removes all session keys.
 func (fs *FSLocalKeyStore) DeleteKeys() error {
-
 	files, err := os.ReadDir(fs.KeyDir)
 	if err != nil {
 		return trace.ConvertSystemError(err)
@@ -276,16 +286,6 @@ func (fs *FSLocalKeyStore) GetKey(idx KeyIndex, opts ...CertOption) (*Key, error
 		return nil, trace.Wrap(err, "no session keys for %+v", idx)
 	}
 
-	priv, err := os.ReadFile(fs.UserKeyPath(idx))
-	if err != nil {
-		fs.log.Error(err)
-		return nil, trace.ConvertSystemError(err)
-	}
-	pub, err := os.ReadFile(fs.sshCAsPath(idx))
-	if err != nil {
-		fs.log.Error(err)
-		return nil, trace.ConvertSystemError(err)
-	}
 	tlsCertFile := fs.tlsCertPath(idx)
 	tlsCert, err := os.ReadFile(tlsCertFile)
 	if err != nil {
@@ -298,11 +298,25 @@ func (fs *FSLocalKeyStore) GetKey(idx KeyIndex, opts ...CertOption) (*Key, error
 		return nil, trace.ConvertSystemError(err)
 	}
 
+	priv, err := keys.LoadPrivateKey(fs.UserKeyPath(idx))
+	if err != nil {
+		fs.log.Error(err)
+		return nil, trace.ConvertSystemError(err)
+	}
+
+	// TODO (Joerger): what benefit does storing the public key provide?
+	// should we just remove it? Use it for validation?
+	//
+	// pub, err := os.ReadFile(fs.publicKeyPath(idx))
+	// if err != nil {
+	// 	fs.log.Error(err)
+	// 	return nil, trace.ConvertSystemError(err)
+	// }
+
 	key := &Key{
-		KeyIndex: idx,
-		Pub:      pub,
-		Priv:     priv,
-		TLSCert:  tlsCert,
+		KeyIndex:   idx,
+		PrivateKey: priv,
+		TLSCert:    tlsCert,
 		TrustedCA: []auth.TrustedCerts{{
 			TLSCertificates: tlsCA,
 		}},
@@ -528,6 +542,11 @@ func (fs *fsLocalNonSessionKeyStore) UserKeyPath(idx KeyIndex) string {
 	return keypaths.UserKeyPath(fs.KeyDir, idx.ProxyHost, idx.Username)
 }
 
+// publicKeyPath returns the public key path for the given KeyIndex.
+func (fs *fsLocalNonSessionKeyStore) publicKeyPath(idx KeyIndex) string {
+	return keypaths.SSHCAsPath(fs.KeyDir, idx.ProxyHost, idx.Username)
+}
+
 // tlsCertPath returns the TLS certificate path given KeyIndex.
 func (fs *fsLocalNonSessionKeyStore) tlsCertPath(idx KeyIndex) string {
 	return keypaths.TLSCertPath(fs.KeyDir, idx.ProxyHost, idx.Username)
@@ -546,11 +565,6 @@ func (fs *fsLocalNonSessionKeyStore) sshCertPath(idx KeyIndex) string {
 // PPKFilePath returns the PPK (PuTTY-formatted) keypair path for the given KeyIndex.
 func (fs *fsLocalNonSessionKeyStore) PPKFilePath(idx KeyIndex) string {
 	return keypaths.PPKFilePath(fs.KeyDir, idx.ProxyHost, idx.Username)
-}
-
-// sshCAsPath returns the SSH CA certificates path for the given KeyIndex.
-func (fs *fsLocalNonSessionKeyStore) sshCAsPath(idx KeyIndex) string {
-	return keypaths.SSHCAsPath(fs.KeyDir, idx.ProxyHost, idx.Username)
 }
 
 //  appCertPath returns the TLS certificate path for the given KeyIndex and app name.

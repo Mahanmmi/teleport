@@ -77,7 +77,7 @@ func TestListKeys(t *testing.T) {
 	skey, err := s.store.GetKey(samIdx, WithSSHCerts{})
 	require.NoError(t, err)
 	require.Equal(t, samKey.Cert, skey.Cert)
-	require.Equal(t, samKey.Pub, skey.Pub)
+	require.Equal(t, samKey.SSHPublicKeyPEM(), skey.SSHPublicKeyPEM())
 }
 
 func TestKeyCRUD(t *testing.T) {
@@ -238,7 +238,7 @@ func TestProxySSHConfig(t *testing.T) {
 	err = s.store.AddKnownHostKeys(firsthost, idx.ProxyHost, []ssh.PublicKey{caPub})
 	require.NoError(t, err)
 
-	clientConfig, err := key.ProxyClientSSHConfig(s.store, firsthost)
+	clientConfig, err := key.SSHConfig(s.store, firsthost)
 	require.NoError(t, err)
 
 	called := atomic.NewInt32(0)
@@ -308,7 +308,7 @@ func TestProxySSHConfig(t *testing.T) {
 
 	// The ProxyClientSSHConfig should create configuration that validates server authority only based on
 	// second-host instead of all known hosts.
-	clientConfig, err = key.ProxyClientSSHConfig(s.store, "second-host")
+	clientConfig, err = key.SSHConfig(s.store, "second-host")
 	require.NoError(t, err)
 	_, err = ssh.Dial("tcp", srv.Addr(), clientConfig)
 	// ssh server cert doesn't match second-host user known host thus connection should fail.
@@ -431,11 +431,9 @@ func (s *keyStoreTest) addKey(key *Key) error {
 
 // makeSignedKey helper returns all 3 components of a user key (signed by CAPriv key)
 func (s *keyStoreTest) makeSignedKey(t *testing.T, idx KeyIndex, makeExpired bool) *Key {
-	var (
-		err             error
-		priv, pub, cert []byte
-	)
-	priv, pub, _ = s.keygen.GenerateKeyPair()
+	priv, err := s.keygen.GeneratePrivateKey()
+	require.NoError(t, err)
+
 	allowedLogins := []string{idx.Username, "root"}
 	ttl := 20 * time.Minute
 	if makeExpired {
@@ -443,8 +441,6 @@ func (s *keyStoreTest) makeSignedKey(t *testing.T, idx KeyIndex, makeExpired boo
 	}
 
 	// reuse the same RSA keys for SSH and TLS keys
-	cryptoPubKey, err := sshutils.CryptoPublicKey(pub)
-	require.NoError(t, err)
 	clock := clockwork.NewRealClock()
 	identity := tlsca.Identity{
 		Username: idx.Username,
@@ -453,7 +449,7 @@ func (s *keyStoreTest) makeSignedKey(t *testing.T, idx KeyIndex, makeExpired boo
 	require.NoError(t, err)
 	tlsCert, err := s.tlsCA.GenerateCertificate(tlsca.CertificateRequest{
 		Clock:     clock,
-		PublicKey: cryptoPubKey,
+		PublicKey: priv.Public(),
 		Subject:   subject,
 		NotAfter:  clock.Now().UTC().Add(ttl),
 	})
@@ -462,9 +458,9 @@ func (s *keyStoreTest) makeSignedKey(t *testing.T, idx KeyIndex, makeExpired boo
 	caSigner, err := ssh.ParsePrivateKey(CAPriv)
 	require.NoError(t, err)
 
-	cert, err = s.keygen.GenerateUserCert(services.UserCertParams{
+	cert, err := s.keygen.GenerateUserCert(services.UserCertParams{
 		CASigner:              caSigner,
-		PublicUserKey:         pub,
+		PublicUserKey:         ssh.MarshalAuthorizedKey(priv.SSHPublicKey()),
 		Username:              idx.Username,
 		AllowedLogins:         allowedLogins,
 		TTL:                   ttl,
@@ -472,10 +468,10 @@ func (s *keyStoreTest) makeSignedKey(t *testing.T, idx KeyIndex, makeExpired boo
 		PermitPortForwarding:  true,
 	})
 	require.NoError(t, err)
+
 	return &Key{
 		KeyIndex:   idx,
-		Priv:       priv,
-		Pub:        pub,
+		PrivateKey: priv,
 		Cert:       cert,
 		TLSCert:    tlsCert,
 		TrustedCA:  []auth.TrustedCerts{s.tlsCACert},

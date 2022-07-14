@@ -1235,9 +1235,10 @@ func TestGenerateDatabaseCert(t *testing.T) {
 	}
 
 	// Generate CSR once for speed sake.
-	priv, _, err := native.GenerateKeyPair()
+	rsaKey, err := native.GenerateRSAPrivateKey()
 	require.NoError(t, err)
-	csr, err := tlsca.GenerateCertificateRequestPEM(pkix.Name{CommonName: "test"}, priv)
+
+	csr, err := tlsca.GenerateCertificateRequestPEM(pkix.Name{CommonName: "test"}, rsaKey)
 	require.NoError(t, err)
 
 	for _, test := range tests {

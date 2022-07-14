@@ -1546,8 +1546,7 @@ func (tc *TeleportClient) LoadKeyForCluster(clusterName string) error {
 	if tc.localAgent == nil {
 		return trace.BadParameter("TeleportClient.LoadKeyForCluster called on a client without localAgent")
 	}
-	_, err := tc.localAgent.LoadKeyForCluster(clusterName)
-	if err != nil {
+	if err := tc.localAgent.LoadKeyForCluster(clusterName); err != nil {
 		return trace.Wrap(err)
 	}
 	return nil
@@ -3251,7 +3250,7 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 
 	// generate a new keypair. the public key will be signed via proxy if client's
 	// password+OTP are valid
-	key, err := NewKey()
+	key, err := GenerateRSAKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -3264,30 +3263,30 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 		if !pr.Auth.AllowPasswordless {
 			return nil, trace.BadParameter("passwordless disallowed by cluster settings")
 		}
-		response, err = tc.pwdlessLogin(ctx, key.Pub)
+		response, err = tc.pwdlessLogin(ctx, key.SSHPublicKeyPEM())
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		username = response.Username
 	case authType == constants.Local:
-		response, err = tc.localLogin(ctx, pr.Auth.SecondFactor, key.Pub)
+		response, err = tc.localLogin(ctx, pr.Auth.SecondFactor, key.SSHPublicKeyPEM())
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 	case authType == constants.OIDC:
-		response, err = tc.ssoLogin(ctx, pr.Auth.OIDC.Name, key.Pub, constants.OIDC)
+		response, err = tc.ssoLogin(ctx, pr.Auth.OIDC.Name, key.SSHPublicKeyPEM(), constants.OIDC)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		username = response.Username
 	case authType == constants.SAML:
-		response, err = tc.ssoLogin(ctx, pr.Auth.SAML.Name, key.Pub, constants.SAML)
+		response, err = tc.ssoLogin(ctx, pr.Auth.SAML.Name, key.SSHPublicKeyPEM(), constants.SAML)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		username = response.Username
 	case authType == constants.Github:
-		response, err = tc.ssoLogin(ctx, pr.Auth.Github.Name, key.Pub, constants.Github)
+		response, err = tc.ssoLogin(ctx, pr.Auth.Github.Name, key.SSHPublicKeyPEM(), constants.Github)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -3502,8 +3501,7 @@ func (tc *TeleportClient) ActivateKey(ctx context.Context, key *Key) error {
 	}
 
 	// save the cert to the local storage (~/.tsh usually):
-	_, err = tc.localAgent.AddKey(key)
-	if err != nil {
+	if err = tc.localAgent.AddKey(key); err != nil {
 		return trace.Wrap(err)
 	}
 
@@ -3893,9 +3891,9 @@ func (tc *TeleportClient) AddTrustedCA(ctx context.Context, ca types.CertAuthori
 }
 
 // AddKey adds a key to the client's local agent, used in tests.
-func (tc *TeleportClient) AddKey(key *Key) (*agent.AddedKey, error) {
+func (tc *TeleportClient) AddKey(key *Key) error {
 	if tc.localAgent == nil {
-		return nil, trace.BadParameter("TeleportClient.AddKey called on a client without localAgent")
+		return trace.BadParameter("TeleportClient.AddKey called on a client without localAgent")
 	}
 	if key.ClusterName == "" {
 		key.ClusterName = tc.SiteName
