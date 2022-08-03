@@ -19,10 +19,11 @@ package sqlbk
 import (
 	"time"
 
-	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
+
+	"github.com/gravitational/teleport/lib/backend"
 )
 
 const (
@@ -47,6 +48,9 @@ type Config struct {
 
 	// Database is the database where teleport will store its data.
 	Database string `json:"database,omitempty"`
+
+	// AzureUsername is the username to use for access in Azure
+	AzureUsername string `json:"azure_username,omitempty"`
 
 	// TLS defines configurations for validating server certificates
 	// and mutual authentication.
@@ -130,11 +134,17 @@ func (c *Config) CheckAndSetDefaults() error {
 	if c.TLS.CAFile == "" {
 		return trace.BadParameter("TLS.CAFile is required")
 	}
+
+	if c.AzureUsername != "" {
+		return nil
+	}
+
 	if c.TLS.ClientKeyFile == "" {
 		return trace.BadParameter("TLS.ClientKeyFile is required")
 	}
 	if c.TLS.ClientCertFile == "" {
 		return trace.BadParameter("TLS.ClientCertFile is required")
 	}
+
 	return nil
 }

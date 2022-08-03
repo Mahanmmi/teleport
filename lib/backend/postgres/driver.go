@@ -26,11 +26,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gravitational/teleport/lib/backend/sqlbk"
+	azpolicy "github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/gravitational/trace"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
+	pgxstdlib "github.com/jackc/pgx/v4/stdlib"
+
+	"github.com/gravitational/teleport/lib/backend/sqlbk"
 )
 
 // pgDriver implements backend.Driver for a PostgreSQL or CockroachDB database.
@@ -63,8 +66,26 @@ func (d *pgDriver) open(ctx context.Context, u *url.URL) (sqlbk.DB, error) {
 	}
 	connConfig.Logger = d.sqlLogger
 
-	// extract the user from the first client certificate in TLSConfig.
-	if connConfig.TLSConfig != nil {
+	beforeConnect := func(ctx context.Context, config *pgx.ConnConfig) error { return nil }
+	if d.cfg.AzureUsername != "" {
+		cred, err := azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		beforeConnect = func(ctx context.Context, config *pgx.ConnConfig) error {
+			d.cfg.Log.Debugf("Fetching Azure access token.")
+			token, err := cred.GetToken(ctx, azpolicy.TokenRequestOptions{
+				Scopes: []string{"https://ossrdbms-aad.database.windows.net/.default"},
+			})
+			if err != nil {
+				return trace.Wrap(err)
+			}
+			d.cfg.Log.WithField("ttl", time.Until(token.ExpiresOn).String()).Debugf("Fetched Azure token.")
+			config.Password = token.Token
+			return nil
+		}
+	} else if connConfig.TLSConfig != nil {
+		// extract the user from the first client certificate in TLSConfig.
 		connConfig.User, err = tlsConfigUser(connConfig.TLSConfig)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -75,16 +96,16 @@ func (d *pgDriver) open(ctx context.Context, u *url.URL) (sqlbk.DB, error) {
 	}
 
 	// Attempt to create backend database if it does not exist.
-	err = d.maybeCreateDatabase(ctx, connConfig)
-	if err != nil {
+	createConfig := connConfig.Copy()
+	if err := beforeConnect(ctx, createConfig); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if err = d.maybeCreateDatabase(ctx, createConfig); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	// Open connection/pool for backend database.
-	db, err := sql.Open("pgx", stdlib.RegisterConnConfig(connConfig))
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
+	db := pgxstdlib.OpenDB(*connConfig, pgxstdlib.OptionBeforeConnect(beforeConnect))
 
 	// Configure the connection pool.
 	db.SetConnMaxIdleTime(d.cfg.ConnMaxIdleTime)
@@ -118,9 +139,9 @@ func (d *pgDriver) maybeCreateDatabase(ctx context.Context, connConfig *pgx.Conn
 	}
 
 	// Copy config and connect to postgres database instead.
-	pgConnConfig := *connConfig
+	pgConnConfig := connConfig.Copy()
 	pgConnConfig.Database = "postgres"
-	pgConn, err := pgx.ConnectConfig(ctx, &pgConnConfig)
+	pgConn, err := pgx.ConnectConfig(ctx, pgConnConfig)
 	if err != nil {
 		return trace.BadParameter("failed to verify %q database exists: %v", connConfig.Database, err)
 	}
@@ -156,8 +177,15 @@ func (d *pgDriver) url() *url.URL {
 	q := u.Query()
 	q.Set("sslmode", "verify-full")
 	q.Set("sslrootcert", d.cfg.TLS.CAFile)
-	q.Set("sslcert", d.cfg.TLS.ClientCertFile)
-	q.Set("sslkey", d.cfg.TLS.ClientKeyFile)
+	if d.cfg.TLS.ClientCertFile != "" {
+		q.Set("sslcert", d.cfg.TLS.ClientCertFile)
+	}
+	if d.cfg.TLS.ClientKeyFile != "" {
+		q.Set("sslkey", d.cfg.TLS.ClientKeyFile)
+	}
+	if d.cfg.AzureUsername != "" {
+		q.Set("user", d.cfg.AzureUsername)
+	}
 	u.RawQuery = q.Encode()
 	return &u
 }
