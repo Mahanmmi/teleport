@@ -199,11 +199,13 @@ const (
 	ALPNSNIAuthProtocol = "teleport-auth@"
 	// ALPNSNIProtocolReverseTunnel is TLS ALPN protocol value used to indicate Proxy reversetunnel protocol.
 	ALPNSNIProtocolReverseTunnel = "teleport-reversetunnel"
+	// ALPNSNIProtocolHTTP is the TLS ALPN protocol value used to indicate HTTP 1.1.
+	ALPNSNIProtocolHTTP = "http/1.1"
 )
 
 const (
 	// KubeSNIPrefix is a SNI Kubernetes prefix used for distinguishing the Kubernetes HTTP traffic.
-	// DELETE IN 11.0. Deprecated, use only KubeTeleportProxyALPNPrefix.
+	// DELETE IN 11.0.
 	KubeSNIPrefix = "kube."
 	// KubeTeleportProxyALPNPrefix is a SNI Kubernetes prefix used for distinguishing the Kubernetes HTTP traffic.
 	KubeTeleportProxyALPNPrefix = "kube-teleport-proxy-alpn."
@@ -272,4 +274,18 @@ const (
 	// TraitAWSRoleARNs is the name of the role variable used to store
 	// allowed AWS role ARNs.
 	TraitAWSRoleARNs = "aws_role_arns"
+)
+
+const (
+	// ConnectionUpgradeWebAPI is the web API to make the HTTP connection
+	// upgrade call.
+	ConnectionUpgradeWebAPI = "/webapi/connectionupgrade"
+
+	// ConnectionUpgradeHeader is the Teleport-specific HTTP header used to
+	// indicate requested protocol types for a connection upgrade.
+	ConnectionUpgradeHeader = "x-teleport-upgrade"
+
+	// ConnectionUpgradeTypeALPN is the requested connection upgrade type for
+	// server-side ALPN handler to serve the tunneled traffic.
+	ConnectionUpgradeTypeALPN = "alpn"
 )

@@ -42,6 +42,7 @@ import (
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/session"
 	"github.com/gravitational/teleport/lib/utils"
+	"github.com/sirupsen/logrus"
 
 	"github.com/gravitational/roundtrip"
 	"github.com/gravitational/trace"
@@ -87,6 +88,7 @@ var _ ClientI = &Client{}
 // teleport/api/client. This Client should only be used internally, or for
 // functionality that hasn't been ported to the new client yet.
 func NewClient(cfg client.Config, params ...roundtrip.ClientParam) (*Client, error) {
+	logrus.Debugf("-->> NewClient to %v", cfg.Addrs)
 	cfg.DialInBackground = true
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, trace.Wrap(err)
@@ -124,6 +126,7 @@ type HTTPClient struct {
 
 // NewHTTPClient creates a new HTTP client with TLS authentication and the given dialer.
 func NewHTTPClient(cfg client.Config, tls *tls.Config, params ...roundtrip.ClientParam) (*HTTPClient, error) {
+	logrus.Debugf("-->> NewHTTPClient to %v", cfg.Addrs)
 	if err := cfg.CheckAndSetDefaults(); err != nil {
 		return nil, err
 	}

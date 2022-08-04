@@ -114,6 +114,19 @@ func NewLocalProxy(cfg LocalProxyConfig) (*LocalProxy, error) {
 
 // Start starts the LocalProxy.
 func (l *LocalProxy) Start(ctx context.Context) error {
+	upstreamDialer, err := client.NewTLSRoutingDialer(client.TLSRoutingDialerConfig{
+		Addr: l.cfg.RemoteProxyAddr,
+		TLSConfig: &tls.Config{
+			NextProtos:         l.cfg.GetProtocols(),
+			InsecureSkipVerify: l.cfg.InsecureSkipVerify,
+			ServerName:         l.cfg.SNI,
+			Certificates:       l.cfg.Certs,
+		},
+	})
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -130,7 +143,7 @@ func (l *LocalProxy) Start(ctx context.Context) error {
 			return trace.Wrap(err)
 		}
 		go func() {
-			if err := l.handleDownstreamConnection(ctx, conn, l.cfg.SNI); err != nil {
+			if err := l.handleDownstreamConnection(ctx, conn, upstreamDialer); err != nil {
 				if utils.IsOKNetworkError(err) {
 					return
 				}
@@ -147,17 +160,9 @@ func (l *LocalProxy) GetAddr() string {
 
 // handleDownstreamConnection proxies the downstreamConn (connection established to the local proxy) and forward the
 // traffic to the upstreamConn (TLS connection to remote host).
-func (l *LocalProxy) handleDownstreamConnection(ctx context.Context, downstreamConn net.Conn, serverName string) error {
+func (l *LocalProxy) handleDownstreamConnection(ctx context.Context, downstreamConn net.Conn, upstreamDialer client.ContextDialer) error {
 	defer downstreamConn.Close()
 
-	upstreamDialer := client.TLSRoutingDialer{
-		Config: &tls.Config{
-			NextProtos:         l.cfg.GetProtocols(),
-			InsecureSkipVerify: l.cfg.InsecureSkipVerify,
-			ServerName:         serverName,
-			Certificates:       l.cfg.Certs,
-		},
-	}
 	upstreamConn, err := upstreamDialer.DialContext(ctx, "tcp", l.cfg.RemoteProxyAddr)
 	if err != nil {
 		return trace.Wrap(err)

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport"
-	"github.com/gravitational/teleport/api/client"
 	apiclient "github.com/gravitational/teleport/api/client"
 	apiproxy "github.com/gravitational/teleport/api/client/proxy"
 	tracessh "github.com/gravitational/teleport/api/observability/tracing/ssh"
@@ -67,9 +66,13 @@ func (d directDial) dialALPNWithDeadline(ctx context.Context, network string, ad
 		return nil, trace.Wrap(err)
 	}
 
-	tlsDialer := client.TLSRoutingDialer{
+	tlsDialer, err := apiclient.NewTLSRoutingDialer(apiclient.TLSRoutingDialerConfig{
 		DialTimeout: config.Timeout,
-		Config:      conf,
+		TLSConfig:   conf,
+		Addr:        addr,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
 
 	tlsConn, err := tlsDialer.DialContext(ctx, network, addr)
@@ -136,12 +139,13 @@ func (d directDial) DialTimeout(ctx context.Context, network, address string, ti
 			return nil, trace.Wrap(err)
 		}
 
-		tlsDialer := client.TLSRoutingDialer{
+		tlsDialer, err := apiclient.NewTLSRoutingDialer(apiclient.TLSRoutingDialerConfig{
 			DialTimeout: timeout,
-			Config:      conf,
-		}
+			TLSConfig:   conf,
+			Addr:        address,
+		})
 
-		tlsConn, err := tlsDialer.DialContext(ctx, "tcp", address)
+		tlsConn, err := tlsDialer.DialContext(ctx, network, address)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
