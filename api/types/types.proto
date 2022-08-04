@@ -3420,6 +3420,9 @@ message RegisterUsingTokenRequest {
     // EC2IdentityDocument is used for the EC2 join method to prove the identity
     // of a joining EC2 instance.
     bytes EC2IdentityDocument = 10 [ (gogoproto.jsontag) = "ec2_id" ];
+    // OIDCJWT is used for OIDC based joining methods, it should be a JWT
+    // obtained from the workload environment.
+    string OIDCJWT = 11 [ (gogoproto.jsontag) = "oidc_jwt" ];
 }
 
 // RecoveryCodes holds a user's recovery code information. Recovery codes allows users to regain

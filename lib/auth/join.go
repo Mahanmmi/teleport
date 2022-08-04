@@ -108,6 +108,10 @@ func (a *Server) RegisterUsingToken(ctx context.Context, req *types.RegisterUsin
 		return nil, trace.AccessDenied("this token is only valid for the IAM " +
 			"join method but the node has connected to the wrong endpoint, make " +
 			"sure your node is configured to use the IAM join method")
+	case types.JoinMethodOIDCGCP:
+		if err := a.checkOIDCJoinRequest(ctx, req); err != nil {
+			return nil, trace.Wrap(err)
+		}
 	case types.JoinMethodToken:
 		// carry on to common token checking logic
 	default:
@@ -144,12 +148,14 @@ func (a *Server) generateCerts(ctx context.Context, provisionToken types.Provisi
 		switch joinMethod {
 		case types.JoinMethodToken:
 			renewable = true
-		case types.JoinMethodIAM:
+		case types.JoinMethodIAM, types.JoinMethodOIDCGCP:
 			renewable = false
 		default:
 			return nil, trace.BadParameter("unsupported join method %q for bot", joinMethod)
 		}
-		certs, err := a.generateInitialBotCerts(ctx, botResourceName, req.PublicSSHKey, expires, renewable)
+		certs, err := a.generateInitialBotCerts(
+			ctx, botResourceName, req.PublicSSHKey, expires, renewable,
+		)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -161,8 +167,8 @@ func (a *Server) generateCerts(ctx context.Context, provisionToken types.Provisi
 				log.WithError(err).Warnf("Could not delete bot provision token %q after generating certs",
 					string(backend.MaskKeyName(provisionToken.GetName())))
 			}
-		case types.JoinMethodIAM:
-			// don't delete long-lived IAM join tokens
+		case types.JoinMethodIAM, types.JoinMethodOIDCGCP:
+			// don't delete long-lived IAM/OIDC join tokens
 		default:
 			return nil, trace.BadParameter("unsupported join method %q for bot", joinMethod)
 		}
