@@ -20,15 +20,15 @@ import "fmt"
 
 // schemaVersion defines the current schema version.
 // Increment this value when adding a new migration.
-const schemaVersion = 1
+const schemaVersion = 2
 
 // getMigration returns migration SQL for a schema version.
 func getMigration(version int) string {
 	switch version {
 	case 1:
 		return migrateV1
-		// case 2:
-		//   return migrateV2
+	case 2:
+		return migrateV2
 	}
 	panic(fmt.Sprintf("migration version not implemented: %v", version))
 }
@@ -61,5 +61,11 @@ const migrateV1 = `
 		id BIGINT NOT NULL,
 		type SMALLINT NOT NULL,
 		CONSTRAINT event_pk PRIMARY KEY (eventid)
+	);
+`
+
+const migrateV2 = `
+	CREATE TABLE audit (
+		sessionid
 	);
 `

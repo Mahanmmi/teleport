@@ -84,6 +84,16 @@ type Reporter struct {
 	topRequestsCache *lru.Cache
 }
 
+func (s *Reporter) Unwrap() Backend {
+	if unwrapper, ok := s.Backend.(interface {
+		Unwrap() Backend
+	}); ok {
+		return unwrapper.Unwrap()
+	}
+
+	return s.Backend
+}
+
 // NewReporter returns a new Reporter.
 func NewReporter(cfg ReporterConfig) (*Reporter, error) {
 	err := utils.RegisterPrometheusCollectors(prometheusCollectors...)

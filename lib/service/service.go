@@ -1308,7 +1308,7 @@ func initUploadHandler(ctx context.Context, auditConfig types.ClusterAuditConfig
 
 // initExternalLog initializes external storage, if the storage is not
 // setup, returns (nil, nil).
-func initExternalLog(ctx context.Context, auditConfig types.ClusterAuditConfig, log logrus.FieldLogger, backend backend.Backend) (events.IAuditLog, error) {
+func initExternalLog(ctx context.Context, auditConfig types.ClusterAuditConfig, log logrus.FieldLogger, authBackend backend.Backend) (events.IAuditLog, error) {
 	var hasNonFileLog bool
 	var loggers []events.IAuditLog
 	for _, eventsURI := range auditConfig.AuditEventsURIs() {
@@ -1352,11 +1352,21 @@ func initExternalLog(ctx context.Context, auditConfig types.ClusterAuditConfig, 
 				return nil, trace.Wrap(err)
 			}
 
-			logger, err := dynamoevents.New(ctx, cfg, backend)
+			logger, err := dynamoevents.New(ctx, cfg, authBackend)
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
 			loggers = append(loggers, logger)
+		case "backend":
+			inner := authBackend
+			if unwrapper, ok := inner.(interface{ Unwrap() backend.Backend }); ok {
+				inner = unwrapper.Unwrap()
+			}
+			if auditLogger, ok := inner.(interface{ AuditLog() events.IAuditLog }); ok {
+				loggers = append(loggers, auditLogger.AuditLog())
+			} else {
+				return nil, trace.BadParameter("configured backend doesn't support storing audit logs")
+			}
 		case teleport.SchemeFile:
 			if uri.Path == "" {
 				return nil, trace.BadParameter("unsupported audit uri: %q (missing path component)", uri)

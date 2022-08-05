@@ -48,6 +48,16 @@ type Sanitizer struct {
 	backend Backend
 }
 
+func (s *Sanitizer) Unwrap() Backend {
+	if unwrapper, ok := s.backend.(interface {
+		Unwrap() Backend
+	}); ok {
+		return unwrapper.Unwrap()
+	}
+
+	return s.backend
+}
+
 // NewSanitizer returns a new Sanitizer.
 func NewSanitizer(backend Backend) *Sanitizer {
 	return &Sanitizer{
