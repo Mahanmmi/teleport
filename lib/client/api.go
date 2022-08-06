@@ -39,6 +39,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-piv/piv-go/piv"
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/client/webclient"
@@ -52,6 +53,7 @@ import (
 	"github.com/gravitational/teleport/api/types/wrappers"
 	apiutils "github.com/gravitational/teleport/api/utils"
 	"github.com/gravitational/teleport/api/utils/keypaths"
+	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/auth"
 	wancli "github.com/gravitational/teleport/lib/auth/webauthncli"
 	"github.com/gravitational/teleport/lib/client/terminal"
@@ -355,6 +357,24 @@ type Config struct {
 	//	on - attempt to load keys into agent
 	//	off - do not attempt to load keys into agent
 	AddKeysToAgent string
+
+	// PIVLogin specifies whether to use a PIV device to generate a private key during login.
+	PIVLogin bool
+
+	// PIVYubikeySerial specifies a specific Yubikey device by serial number to use
+	// during PIV login.
+	PIVYubikeySerial string
+
+	// PIVSlot specifies what PIV slot to generate a private key on during PIV login.
+	PIVSlot piv.Slot
+
+	// PIVPINPolicy specifies how often the user needs to provide their PIV PIN to access
+	// the PIV private key.
+	PIVPINPolicy piv.PINPolicy
+
+	// PIVPINPolicy specifies how often the user needs to touch their PIV device to access
+	// the PIV private key.
+	PIVTouchPolicy piv.TouchPolicy
 
 	// EnableEscapeSequences will scan Stdin for SSH escape sequences during
 	// command/shell execution. This also requires Stdin to be an interactive
@@ -3243,9 +3263,8 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	// generate a new keypair. the public key will be signed via proxy if client's
-	// password+OTP are valid
-	key, err := GenerateRSAKey()
+	// generate a new private key. the public key will be signed via proxy if client's password+OTP are valid
+	key, err := tc.generateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -3322,6 +3341,18 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 	}
 
 	return key, nil
+}
+
+func (tc *TeleportClient) generateKey() (*Key, error) {
+	if tc.PIVLogin {
+		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, tc.PIVYubikeySerial, tc.PIVSlot, tc.PIVPINPolicy, tc.PIVTouchPolicy)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return NewKey(priv)
+	}
+
+	return GenerateRSAKey()
 }
 
 func (tc *TeleportClient) pwdlessLogin(ctx context.Context, pubKey []byte) (*auth.SSHLoginResponse, error) {

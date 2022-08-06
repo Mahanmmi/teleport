@@ -38,9 +38,9 @@ type RSAPrivateKey struct {
 	sshPub        ssh.PublicKey
 }
 
-// ParseRSAPrivateKey parses an RSAPRivateKey key in PKCS #1, ASN.1 DER form.
-func ParseRSAPrivateKey(keyDER []byte) (*RSAPrivateKey, error) {
-	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(keyDER)
+// parseRSAPrivateKey parses an RSAPRivateKey key in PKCS #1, ASN.1 DER form.
+func parseRSAPrivateKey(privBytes []byte) (*RSAPrivateKey, error) {
+	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(privBytes)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

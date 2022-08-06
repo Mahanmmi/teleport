@@ -38,8 +38,8 @@ type ECDSAPrivateKey struct {
 	sshPub        ssh.PublicKey
 }
 
-// ParseECDSAPrivateKey parses an ECDSAPRivateKey key in SEC 1, ASN.1 DER form.
-func ParseECDSAPrivateKey(keyDER []byte) (*ECDSAPrivateKey, error) {
+// parseECDSAPrivateKey parses an ECDSAPRivateKey key in SEC 1, ASN.1 DER form.
+func parseECDSAPrivateKey(keyDER []byte) (*ECDSAPrivateKey, error) {
 	ecdsaPrivateKey, err := x509.ParseECPrivateKey(keyDER)
 	if err != nil {
 		return nil, trace.Wrap(err)
