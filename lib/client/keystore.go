@@ -34,6 +34,7 @@ import (
 	"github.com/gravitational/teleport/api/profile"
 	"github.com/gravitational/teleport/api/utils/keypaths"
 	"github.com/gravitational/teleport/api/utils/keys"
+	apisshutils "github.com/gravitational/teleport/api/utils/sshutils"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/sshutils"
 	"github.com/gravitational/teleport/lib/utils"
@@ -93,6 +94,10 @@ type LocalKeyStore interface {
 	// GetTrustedCertsPEM gets trusted TLS certificates of certificate authorities.
 	// Each returned byte slice contains an individual PEM block.
 	GetTrustedCertsPEM(proxyHost string) ([][]byte, error)
+
+	// GetSSHCertificates gets all certificates signed for the given user and proxy,
+	// including certificates for trusted clusters.
+	GetSSHCertificates(proxyHost, username string) ([]*ssh.Certificate, error)
 }
 
 // FSLocalKeyStore implements LocalKeyStore interface using the filesystem.
@@ -416,6 +421,7 @@ func (o WithSSHCerts) updateKeyWithBytes(key *Key, certBytes []byte) error {
 			return trace.Wrap(err)
 		}
 	}
+
 	return nil
 }
 
@@ -555,6 +561,11 @@ func (fs *fsLocalNonSessionKeyStore) tlsCertPath(idx KeyIndex) string {
 // tlsCAsPath returns the TLS CA certificates path for the given KeyIndex.
 func (fs *fsLocalNonSessionKeyStore) tlsCAsPath(proxy string) string {
 	return keypaths.TLSCAsPath(fs.KeyDir, proxy)
+}
+
+// sshDir returns the SSH certificate path for the given KeyIndex.
+func (fs *fsLocalNonSessionKeyStore) sshDir(proxy, user string) string {
+	return keypaths.SSHDir(fs.KeyDir, proxy, user)
 }
 
 // sshCertPath returns the SSH certificate path for the given KeyIndex.
@@ -843,6 +854,30 @@ func (fs *fsLocalNonSessionKeyStore) GetTrustedCertsPEM(proxyHost string) ([][]b
 	return blocks, nil
 }
 
+// GetSSHCertificates gets all certificates signed for the given user and proxy.
+func (fs *fsLocalNonSessionKeyStore) GetSSHCertificates(proxyHost, username string) ([]*ssh.Certificate, error) {
+	certDir := fs.sshDir(proxyHost, username)
+	certFiles, err := os.ReadDir(certDir)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	sshCerts := make([]*ssh.Certificate, len(certFiles))
+	for i, certFile := range certFiles {
+		data, err := os.ReadFile(filepath.Join(certDir, certFile.Name()))
+		if err != nil {
+			return nil, trace.ConvertSystemError(err)
+		}
+
+		sshCerts[i], err = apisshutils.ParseCertificate(data)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+
+	return sshCerts, nil
+}
+
 // noLocalKeyStore is a LocalKeyStore representing the absence of a keystore.
 // All methods return errors. This exists to avoid nil checking everywhere in
 // LocalKeyAgent and prevent nil pointer panics.
@@ -873,6 +908,9 @@ func (noLocalKeyStore) SaveTrustedCerts(proxyHost string, cas []auth.TrustedCert
 	return errNoLocalKeyStore
 }
 func (noLocalKeyStore) GetTrustedCertsPEM(proxyHost string) ([][]byte, error) {
+	return nil, errNoLocalKeyStore
+}
+func (noLocalKeyStore) GetSSHCertificates(proxyHost, username string) ([]*ssh.Certificate, error) {
 	return nil, errNoLocalKeyStore
 }
 
@@ -995,4 +1033,18 @@ func (s *MemLocalKeyStore) DeleteUserCerts(idx KeyIndex, opts ...CertOption) err
 		}
 	}
 	return nil
+}
+
+// GetSSHCertificates gets all certificates signed for the given user and proxy.
+func (s *MemLocalKeyStore) GetSSHCertificates(proxyHost, username string) ([]*ssh.Certificate, error) {
+	var sshCerts []*ssh.Certificate
+	for _, key := range s.inMem[proxyHost][username] {
+		sshCert, err := key.SSHCert()
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		sshCerts = append(sshCerts, sshCert)
+	}
+
+	return sshCerts, nil
 }

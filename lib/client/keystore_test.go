@@ -80,6 +80,33 @@ func TestListKeys(t *testing.T) {
 	require.Equal(t, samKey.SSHPublicKeyPEM(), skey.SSHPublicKeyPEM())
 }
 
+func TestGetCertificates(t *testing.T) {
+	s, cleanup := newTest(t)
+	defer cleanup()
+
+	const keyNum = 3
+
+	// add keys for 3 different clusters with the same user and proxy.
+	keys := make([]Key, keyNum)
+	var proxy = "proxy.example.com"
+	var user = "bob"
+	for i := 0; i < keyNum; i++ {
+		idx := KeyIndex{proxy, user, fmt.Sprintf("cluster-%v", i)}
+		key := s.makeSignedKey(t, idx, false)
+		require.NoError(t, s.addKey(key))
+		keys[i] = *key
+	}
+
+	certificates, err := s.store.GetSSHCertificates(proxy, user)
+	require.NoError(t, err)
+
+	for i := 0; i < keyNum; i++ {
+		expectCert, err := keys[i].SSHCert()
+		require.NoError(t, err)
+		require.Equal(t, expectCert, certificates[i])
+	}
+}
+
 func TestKeyCRUD(t *testing.T) {
 	s, cleanup := newTest(t)
 	defer cleanup()

@@ -500,13 +500,22 @@ func (k *Key) ActiveRequests() (services.RequestIDs, error) {
 	return activeRequests, nil
 }
 
-// CheckCert makes sure the SSH certificate is valid.
+// CheckCert makes sure the key's SSH certificate is valid.
 func (k *Key) CheckCert() error {
 	sshCert, err := k.SSHCert()
 	if err != nil {
 		return trace.Wrap(err)
 	}
 
+	if err := k.checkCert(sshCert); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return nil
+}
+
+// checkCert makes sure the given SSH certificate is valid.
+func (k *Key) checkCert(sshCert *ssh.Certificate) error {
 	// Check that the certificate was for the current public key. If not, the
 	// public/private key pair may have been rotated.
 	if !sshutils.KeysEqual(sshCert.Key, k.SSHPublicKey()) {

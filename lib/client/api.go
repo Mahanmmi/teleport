@@ -2956,14 +2956,9 @@ func (tc *TeleportClient) connectToProxy(ctx context.Context) (*ProxyClient, err
 			}
 		}
 	} else if tc.localAgent != nil {
-		// tc.SiteName does not necessarily point to the cluster we're
-		// connecting to (or that we have certs for). For example tsh login
-		// leaf will set tc.SiteName as "leaf" even though we're connecting to
-		// root proxy to fetch leaf certs.
-		//
-		// Instead, load SSH certs for all clusters we have (by passing an
-		// empty string to certsForCluster).
-		signers, err := tc.localAgent.certsForCluster("")
+		// Instead, load SSH certs for all clusters we have, in case we don't yet
+		// have a certificate for tc.SiteName (like during `tsh login leaf`).
+		signers, err := tc.localAgent.signers()
 		// errNoLocalKeyStore is returned when running in the proxy. The proxy
 		// should be passing auth methods via tc.Config.AuthMethods.
 		if err != nil && !errors.Is(err, errNoLocalKeyStore) && !trace.IsNotFound(err) {
@@ -3127,7 +3122,7 @@ func (tc *TeleportClient) signersForCluster(ctx context.Context, clusterName str
 		log.WithError(err).Warnf("Failed to load/reissue keys for cluster %q.", clusterName)
 		return nil, trace.Wrap(err)
 	}
-	return tc.localAgent.certsForCluster(clusterName)
+	return tc.localAgent.signersForCluster(clusterName)
 }
 
 // WithoutJumpHosts executes the given function with a Teleport client that has

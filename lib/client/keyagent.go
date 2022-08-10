@@ -32,6 +32,7 @@ import (
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/utils/sshutils"
+	apisshutils "github.com/gravitational/teleport/api/utils/sshutils"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/utils/prompt"
 
@@ -583,44 +584,45 @@ func (a *LocalKeyAgent) DeleteKeys() error {
 	return nil
 }
 
-// certsForCluster returns a set of ssh.Signers using certificates for a
-// specific cluster. If clusterName is empty, certsForCluster returns
-// ssh.Signers for all known clusters.
-func (a *LocalKeyAgent) certsForCluster(clusterName string) ([]ssh.Signer, error) {
-	if clusterName != "" {
-		k, err := a.GetKey(clusterName, WithSSHCerts{})
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		signer, err := k.SSHSigner()
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return []ssh.Signer{signer}, nil
+// certsForCluster returns a set of ssh.Signers using all certificates
+// for the current proxy and user.
+func (a *LocalKeyAgent) signers() ([]ssh.Signer, error) {
+	k, err := a.GetCoreKey()
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
 
-	// Load all certs, including the ones from a local SSH agent.
-	var signers []ssh.Signer
-	if a.sshAgent != nil {
-		if sshAgentCerts, _ := a.sshAgent.Signers(); sshAgentCerts != nil {
-			signers = append(signers, sshAgentCerts...)
+	certs, err := a.keyStore.GetSSHCertificates(a.proxyHost, a.username)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	signers := make([]ssh.Signer, len(certs))
+	for i, cert := range certs {
+		if err := k.checkCert(cert); err != nil {
+			return nil, trace.Wrap(err)
 		}
-	}
-	if ourCerts, _ := a.Signers(); ourCerts != nil {
-		signers = append(signers, ourCerts...)
-	}
-	// Filter out non-certificates (like regular public SSH keys stored in the SSH agent).
-	certs := make([]ssh.Signer, 0, len(signers))
-	for _, s := range signers {
-		if _, ok := s.PublicKey().(*ssh.Certificate); !ok {
-			continue
+		signer, err := apisshutils.SSHSigner(cert, k)
+		if err != nil {
+			return nil, trace.Wrap(err)
 		}
-		certs = append(certs, s)
+		signers[i] = signer
 	}
-	if len(certs) == 0 {
-		return nil, trace.NotFound("no auth method available")
+
+	return signers, nil
+}
+
+// signersForCluster returns a set of ssh.Signers using certificates for a specific cluster.
+func (a *LocalKeyAgent) signersForCluster(clusterName string) ([]ssh.Signer, error) {
+	k, err := a.GetKey(clusterName, WithSSHCerts{})
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
-	return certs, nil
+	signer, err := k.SSHSigner()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return []ssh.Signer{signer}, nil
 }
 
 // ClientCertPool returns x509.CertPool containing trusted CA.
