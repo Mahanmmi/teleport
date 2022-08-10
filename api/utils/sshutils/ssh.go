@@ -25,6 +25,7 @@ import (
 	"net"
 
 	"github.com/gravitational/teleport/api/defaults"
+
 	"github.com/gravitational/trace"
 	"golang.org/x/crypto/ssh"
 )
@@ -96,44 +97,49 @@ func ParseAuthorizedKeys(authorizedKeys [][]byte) ([]ssh.PublicKey, error) {
 	return keys, nil
 }
 
-// ProxyClientSSHConfigWithCAs returns an ssh.ClientConfig for the given ssh certificate and private key (signer),
-// with a HostKeyCallback function matching the given SSH CAs.
+// ProxyClientSSHConfig returns an ssh.ClientConfig from the given ssh.AuthMethod.
+// If sshCAs are provided, they will be used in the config's HostKeyCallback.
 //
 // The config is set up to authenticate to proxy with the first available principal.
-func ProxyClientSSHConfigWithCAs(sshCert *ssh.Certificate, signer crypto.Signer, sshCAs [][]byte) (*ssh.ClientConfig, error) {
-	sshConfig, err := ProxyClientSSHConfig(sshCert, signer)
+func ProxyClientSSHConfig(sshCert *ssh.Certificate, priv crypto.Signer, sshCAs ...[]byte) (*ssh.ClientConfig, error) {
+	authMethod, err := AsAuthMethod(sshCert, priv)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	sshConfig.HostKeyCallback, err = HostKeyCallback(sshCAs, false)
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to convert certificate authorities to HostKeyCallback")
-	}
-
-	return sshConfig, nil
-}
-
-// ProxyClientSSHConfig returns an ssh.ClientConfig for the given ssh certificate and private key (signer).
-//
-// The config is set up to authenticate to proxy with the first available principal.
-func ProxyClientSSHConfig(sshCert *ssh.Certificate, priv crypto.Signer) (*ssh.ClientConfig, error) {
-	authMethod, err := AsAuthMethod(sshCert, priv)
-	if err != nil {
-		return nil, trace.Wrap(err, "failed to convert key pair to auth method")
+	cfg := &ssh.ClientConfig{
+		Auth:    []ssh.AuthMethod{authMethod},
+		Timeout: defaults.DefaultDialTimeout,
 	}
 
 	// The KeyId is not always a valid principal, so we use the first valid principal instead.
-	user := sshCert.KeyId
+	cfg.User = sshCert.KeyId
 	if len(sshCert.ValidPrincipals) > 0 {
-		user = sshCert.ValidPrincipals[0]
+		cfg.User = sshCert.ValidPrincipals[0]
 	}
 
-	return &ssh.ClientConfig{
-		User:    user,
-		Auth:    []ssh.AuthMethod{authMethod},
-		Timeout: defaults.DefaultDialTimeout,
-	}, nil
+	if len(sshCAs) > 0 {
+		var err error
+		cfg.HostKeyCallback, err = HostKeyCallback(sshCAs, false)
+		if err != nil {
+			return nil, trace.Wrap(err, "failed to convert certificate authorities to HostKeyCallback")
+		}
+	}
+
+	return cfg, nil
+}
+
+// SSHSigner returns an ssh.Signer from certificate and private key
+func SSHSigner(sshCert *ssh.Certificate, signer crypto.Signer) (ssh.Signer, error) {
+	sshSigner, err := ssh.NewSignerFromKey(signer)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	sshSigner, err = ssh.NewCertSigner(sshCert, sshSigner)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return sshSigner, nil
 }
 
 // AsAuthMethod returns an "auth method" interface, a common abstraction
@@ -145,19 +151,6 @@ func AsAuthMethod(sshCert *ssh.Certificate, signer crypto.Signer) (ssh.AuthMetho
 		return nil, trace.Wrap(err)
 	}
 	return ssh.PublicKeys(sshSigner), nil
-}
-
-// AsSigner returns an ssh.Signer from private key and certificate.
-func SSHSigner(sshCert *ssh.Certificate, signer crypto.Signer) (ssh.Signer, error) {
-	sshSigner, err := ssh.NewSignerFromKey(signer)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	sshSigner, err = ssh.NewCertSigner(sshCert, sshSigner)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return sshSigner, nil
 }
 
 // HostKeyCallback returns an ssh.HostKeyCallback that validates host

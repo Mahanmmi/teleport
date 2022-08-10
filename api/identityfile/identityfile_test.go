@@ -32,7 +32,7 @@ func TestIdentityFileBasics(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "file")
 	writeIDFile := &identityfile.IdentityFile{
-		PrivateKeyData: []byte("-----BEGIN RSA PRIVATE KEY-----\nkey\n-----END RSA PRIVATE KEY-----\n"),
+		PrivateKey: []byte("-----BEGIN RSA PRIVATE KEY-----\nkey\n-----END RSA PRIVATE KEY-----\n"),
 		Certs: identityfile.Certs{
 			SSH: []byte("ssh ssh-cert"),
 			TLS: []byte("-----BEGIN CERTIFICATE-----\ntls-cert\n-----END CERTIFICATE-----\n"),

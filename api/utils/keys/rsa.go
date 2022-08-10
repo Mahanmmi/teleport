@@ -49,24 +49,8 @@ func NewRSAPrivateKey(priv *rsa.PrivateKey) (*RSAPrivateKey, error) {
 	}, nil
 }
 
-// parseRSAPrivateKey parses the given private key data.
-func parseRSAPrivateKey(privateKeyData []byte) (*RSAPrivateKey, error) {
-	rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(privateKeyData)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	sshPub, err := ssh.NewPublicKey(rsaPrivateKey.Public())
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return &RSAPrivateKey{
-		PrivateKey: rsaPrivateKey,
-		sshPub:     sshPub,
-	}, nil
-}
-
-// PrivateKeyDataPEM returns the PEM encoded RSA private key.
-func (r *RSAPrivateKey) PrivateKeyDataPEM() []byte {
+// PrivateKeyPEM returns the PEM encoded RSA private key.
+func (r *RSAPrivateKey) PrivateKeyPEM() []byte {
 	return pem.EncodeToMemory(&pem.Block{
 		Type:    rsaPrivateKeyType,
 		Headers: nil,
@@ -82,7 +66,7 @@ func (r *RSAPrivateKey) SSHPublicKey() ssh.PublicKey {
 // TLSCertificate parses the given TLS certificate paired with the private key
 // to rerturn a tls.Certificate, ready to be used in a TLS handshake.
 func (r *RSAPrivateKey) TLSCertificate(certRaw []byte) (cert tls.Certificate, err error) {
-	cert, err = tls.X509KeyPair(certRaw, r.PrivateKeyDataPEM())
+	cert, err = tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
 	if err != nil {
 		return cert, trace.Wrap(err)
 	}
@@ -107,8 +91,7 @@ func (r *RSAPrivateKey) AsAgentKeys(sshCert *ssh.Certificate) []agent.AddedKey {
 	}
 
 	if runtime.GOOS != constants.WindowsOS {
-		// On Unix, return the certificate (with embedded private key) as well as
-		// a private key.
+		// On Unix, also return a lone private key.
 		//
 		// (2016-08-01) have a bug in how they use certificates that have been lo
 		// This is done because OpenSSH clients older than OpenSSH 7.3/7.3p1aded

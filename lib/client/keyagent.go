@@ -202,12 +202,11 @@ func (a *LocalKeyAgent) LoadKey(key Key) error {
 	// convert keys into a format understood by the ssh agent
 	agentKeys, err := key.AsAgentKeys()
 	if err != nil {
+		if trace.IsNotImplemented(err) {
+			a.log.WithError(err).Infof("Failed to load SSH key for user %q and cluster %q.", a.username, key.ClusterName)
+			return nil
+		}
 		return trace.Wrap(err)
-	}
-
-	if len(agentKeys) == 0 {
-		// key has no agent keys to add to agent, noop
-		return nil
 	}
 
 	a.log.Infof("Loading SSH key for user %q and cluster %q.", a.username, key.ClusterName)

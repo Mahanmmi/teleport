@@ -36,7 +36,7 @@ import (
 
 // ConvertToPPK takes a regular RSA-formatted keypair and converts it into the PPK file format used by the PuTTY SSH client.
 // The file format is described here: https://the.earth.li/~sgtatham/putty/0.76/htmldoc/AppendixC.html#ppk
-func ConvertToPPK(priv *rsa.PrivateKey, pub []byte) ([]byte, error) {
+func ConvertToPPK(privateKey *rsa.PrivateKey, pub []byte) ([]byte, error) {
 	// https://the.earth.li/~sgtatham/putty/0.76/htmldoc/AppendixC.html#ppk
 	// RSA keys are stored using an algorithm-name of 'ssh-rsa'. (Keys stored like this are also used by the updated RSA signature schemes that use
 	// hashes other than SHA-1. The public key data has already provided the key modulus and the public encoding exponent. The private data stores:
@@ -48,13 +48,13 @@ func ConvertToPPK(priv *rsa.PrivateKey, pub []byte) ([]byte, error) {
 
 	// mpint: the private decoding exponent of the key.
 	// this is known as 'D'
-	binary.Write(ppkPrivateKey, binary.BigEndian, getRFC4251Mpint(priv.D))
+	binary.Write(ppkPrivateKey, binary.BigEndian, getRFC4251Mpint(privateKey.D))
 
 	// mpint: one prime factor p of the key.
 	// this is known as 'P'
 	// the RSA standard dictates that P > Q
 	// for some reason what PuTTY names 'P' is Primes[1] to Go, and what PuTTY names 'Q' is Primes[0] to Go
-	P, Q := priv.Primes[1], priv.Primes[0]
+	P, Q := privateKey.Primes[1], privateKey.Primes[0]
 	binary.Write(ppkPrivateKey, binary.BigEndian, getRFC4251Mpint(P))
 
 	// mpint: the other prime factor q of the key. (RSA keys stored in this format are expected to have exactly two prime factors.)

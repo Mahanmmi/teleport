@@ -20,6 +20,7 @@ package keys
 import (
 	"crypto"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"os"
 
@@ -40,10 +41,13 @@ type PrivateKey interface {
 	// Equal returns whether the given key is equal to this key
 	Equal(x crypto.PrivateKey) bool
 
-	// PrivateKeyDataPEM returns PEM encoded private key data. This may be data necessary
+	// PrivateKeyPEM returns PEM encoded private key data. This may be data necessary
 	// to retrieve the key, such as a Yubikey serial number and slot, or it can be a
-	// full PEM encoded RSA private key.
-	PrivateKeyDataPEM() []byte
+	// PKCS marshalled private key.
+	//
+	// The resulting PEM encoded data should only be decoded with ParsePrivateKey to
+	// prevent errors from parsing non PKCS marshalled keys, such as a PIV key.
+	PrivateKeyPEM() []byte
 
 	// SSHPublicKey returns the ssh.PublicKey representiation of the public key.
 	SSHPublicKey() ssh.PublicKey
@@ -65,7 +69,11 @@ func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
 
 	switch block.Type {
 	case rsaPrivateKeyType:
-		return parseRSAPrivateKey(block.Bytes)
+		rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return NewRSAPrivateKey(rsaPrivateKey)
 	default:
 		return nil, trace.BadParameter("unexpected private key PEM type %q", block.Type)
 	}
@@ -83,15 +91,6 @@ func LoadPrivateKey(keyFile string) (PrivateKey, error) {
 		return nil, trace.Wrap(err)
 	}
 	return priv, nil
-}
-
-// GetRSAPrivateKeyPEM returns a PEM encoded RSA private key for the given key.
-// If the given key is not an RSA key, then an error will be returned.
-func GetRSAPrivateKeyPEM(k PrivateKey) ([]byte, error) {
-	if _, ok := k.(*RSAPrivateKey); !ok {
-		return nil, trace.BadParameter("cannot get rsa key PEM for private key of type %T", k)
-	}
-	return k.PrivateKeyDataPEM(), nil
 }
 
 // LoadX509KeyPair parse a tls.Certificate from a private key file and certificate file.
@@ -129,4 +128,16 @@ func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (tls.Certificate, error) {
 	}
 
 	return tlsCert, nil
+}
+
+// GetRSAPrivateKeyPEM returns a PEM encoded RSA private key for the given key.
+// If the given key is not an RSA key, then an error will be returned.
+//
+// This is used by some integrations which currently only support raw RSA private keys,
+// like Kubernetes, MongoDB, and PPK files for windows.
+func GetRSAPrivateKeyPEM(k PrivateKey) ([]byte, error) {
+	if _, ok := k.(*RSAPrivateKey); !ok {
+		return nil, trace.BadParameter("cannot get rsa key PEM for private key of type %T", k)
+	}
+	return k.PrivateKeyPEM(), nil
 }

@@ -120,7 +120,7 @@ func TestWrite(t *testing.T) {
 	// key is OK:
 	out, err := os.ReadFile(cfg.OutputPath)
 	require.NoError(t, err)
-	require.Equal(t, string(out), string(key.PrivateKeyDataPEM()))
+	require.Equal(t, string(out), string(key.PrivateKeyPEM()))
 
 	// cert is OK:
 	out, err = os.ReadFile(keypaths.IdentitySSHCertPath(cfg.OutputPath))
@@ -138,7 +138,7 @@ func TestWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	wantArr := [][]byte{
-		key.PrivateKeyDataPEM(),
+		key.PrivateKeyPEM(),
 		{'\n'},
 		key.Cert,
 		key.TLSCert,

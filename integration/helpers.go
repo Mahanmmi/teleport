@@ -130,6 +130,7 @@ func createAgent(me *user.User, key *client.Key) (*teleagent.AgentServer, string
 	if err != nil {
 		return nil, "", "", trace.Wrap(err)
 	}
+
 	agentKey := agentKeys[0]
 	agentKey.Comment = ""
 

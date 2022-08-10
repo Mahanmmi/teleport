@@ -2914,13 +2914,16 @@ func makeClientForProxy(cf *CLIConf, proxy string, useProfileLogin bool) (*clien
 		// sessions.
 		c.Agent = agent.NewKeyring()
 		agentKeys, err := key.AsAgentKeys()
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		for _, k := range agentKeys {
-			if err := c.Agent.Add(k); err != nil {
-				return nil, trace.Wrap(err)
+		if err == nil {
+			for _, k := range agentKeys {
+				if err := c.Agent.Add(k); err != nil {
+					return nil, trace.Wrap(err)
+				}
 			}
+		} else if trace.IsNotImplemented(err) {
+			log.WithError(err).Infof("Failed to add key to agent keys.")
+		} else {
+			return nil, trace.Wrap(err)
 		}
 
 		if len(key.TLSCert) > 0 {

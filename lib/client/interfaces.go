@@ -25,6 +25,7 @@ import (
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/identityfile"
+	apiutils "github.com/gravitational/teleport/api/utils"
 	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/api/utils/sshutils"
 	"github.com/gravitational/teleport/api/utils/sshutils/ppk"
@@ -139,7 +140,7 @@ func KeyFromIdentityFile(path string) (*Key, error) {
 		return nil, trace.Wrap(err, "failed to parse identity file")
 	}
 
-	priv, err := keys.ParsePrivateKey(ident.PrivateKeyData)
+	priv, err := keys.ParsePrivateKey(ident.PrivateKey)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -303,11 +304,11 @@ func (k *Key) clientTLSConfig(cipherSuites []uint16, tlsCertRaw []byte, clusters
 	tlsConfig.Certificates = append(tlsConfig.Certificates, tlsCert)
 	// Use Issuer CN from the certificate to populate the correct SNI in
 	// requests.
-	// leaf, err := x509.ParseCertificate(tlsCert.Certificate[0])
-	// if err != nil {
-	// 	return nil, trace.Wrap(err, "failed to parse TLS cert")
-	// }
-	// tlsConfig.ServerName = apiutils.EncodeClusterName(leaf.Issuer.CommonName)
+	leaf, err := x509.ParseCertificate(tlsCert.Certificate[0])
+	if err != nil {
+		return nil, trace.Wrap(err, "failed to parse TLS cert")
+	}
+	tlsConfig.ServerName = apiutils.EncodeClusterName(leaf.Issuer.CommonName)
 	return tlsConfig, nil
 }
 
@@ -330,13 +331,13 @@ func (k *Key) clientCertPool(clusters ...string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// SSHConfig returns an ssh.ClientConfig with SSH credentials from this
+// ProxyClientSSHConfig returns an ssh.ClientConfig with SSH credentials from this
 // Key and HostKeyCallback matching SSH CAs in the Key.
 //
 // The config is set up to authenticate to proxy with the first available principal
 // and ( if keyStore != nil ) trust local SSH CAs without asking for public keys.
 //
-func (k *Key) SSHConfig(keyStore sshKnowHostGetter, host string) (*ssh.ClientConfig, error) {
+func (k *Key) ProxyClientSSHConfig(keyStore sshKnowHostGetter, host string) (*ssh.ClientConfig, error) {
 	sshCert, err := k.SSHCert()
 	if err != nil {
 		return nil, trace.Wrap(err, "failed to extract username from SSH certificate")
@@ -390,12 +391,14 @@ func (k *Key) CertRoles() ([]string, error) {
 	return roles, nil
 }
 
+// AsAgentKeys converts client.Key struct to a []*agent.AddedKey. All elements
+// of the []*agent.AddedKey slice need to be loaded into the agent!
 func (k *Key) AsAgentKeys() ([]agent.AddedKey, error) {
-	sshCert, err := k.SSHCert()
+	cert, err := k.SSHCert()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return k.PrivateKey.AsAgentKeys(sshCert), nil
+	return k.PrivateKey.AsAgentKeys(cert), nil
 }
 
 // TeleportTLSCertificate returns the parsed x509 certificate for
@@ -502,12 +505,12 @@ func (k *Key) ActiveRequests() (services.RequestIDs, error) {
 
 // CheckCert makes sure the key's SSH certificate is valid.
 func (k *Key) CheckCert() error {
-	sshCert, err := k.SSHCert()
+	cert, err := k.SSHCert()
 	if err != nil {
 		return trace.Wrap(err)
 	}
 
-	if err := k.checkCert(sshCert); err != nil {
+	if err := k.checkCert(cert); err != nil {
 		return trace.Wrap(err)
 	}
 

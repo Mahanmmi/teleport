@@ -65,10 +65,10 @@ func TestLoadIdentityFile(t *testing.T) {
 	// Write identity file to disk.
 	path := filepath.Join(t.TempDir(), "file")
 	idFile := &identityfile.IdentityFile{
-		PrivateKeyData: keyPEM,
+		PrivateKey: keyPEM,
 		Certs: identityfile.Certs{
 			TLS: tlsCert,
-			SSH: sshCertRaw,
+			SSH: sshCert,
 		},
 		CACerts: identityfile.CACerts{
 			TLS: [][]byte{tlsCACert},
@@ -108,10 +108,10 @@ func TestLoadIdentityFileFromString(t *testing.T) {
 	// Write identity file to disk.
 	path := filepath.Join(t.TempDir(), "file")
 	idFile := &identityfile.IdentityFile{
-		PrivateKeyData: keyPEM,
+		PrivateKey: keyPEM,
 		Certs: identityfile.Certs{
 			TLS: tlsCert,
-			SSH: sshCertRaw,
+			SSH: sshCert,
 		},
 		CACerts: identityfile.CACerts{
 			TLS: [][]byte{tlsCACert},
@@ -234,7 +234,7 @@ func writeProfile(t *testing.T, p *profile.Profile) {
 	require.NoError(t, os.WriteFile(p.TLSCAPathCluster(p.SiteName), tlsCACert, 0600))
 	require.NoError(t, os.WriteFile(p.KnownHostsPath(), sshCACert, 0600))
 	require.NoError(t, os.MkdirAll(p.SSHDir(), 0700))
-	require.NoError(t, os.WriteFile(p.SSHCertPath(), sshCertRaw, 0600))
+	require.NoError(t, os.WriteFile(p.SSHCertPath(), sshCert, 0600))
 	require.NoError(t, os.WriteFile(p.PPKFilePath(), ppkFile, 0600))
 }
 
@@ -252,13 +252,13 @@ func getExpectedTLSConfig(t *testing.T) *tls.Config {
 }
 
 func getExpectedSSHConfig(t *testing.T) *ssh.ClientConfig {
-	sshCert, err := sshutils.ParseCertificate(sshCertRaw)
+	cert, err := sshutils.ParseCertificate(sshCert)
 	require.NoError(t, err)
 
 	priv, err := keys.ParsePrivateKey(keyPEM)
 	require.NoError(t, err)
 
-	config, err := sshutils.ProxyClientSSHConfigWithCAs(sshCert, priv, [][]byte{sshCACert})
+	config, err := sshutils.ProxyClientSSHConfig(cert, priv, sshCACert)
 	require.NoError(t, err)
 
 	return config
@@ -352,7 +352,7 @@ UpgZGjcwco4eqXm7rgbQ4wLaMU6hyk8OE5Glk5E6qpnbVzlrL/jl2iE6EqvI6GJn
 Na6B0YR7mdrrL+lyzymnOr6UOrT5nUWRAB1QeY7dhBNnsvoZwaS3VLSc1KCk
 -----END CERTIFICATE-----`)
 
-	sshCertRaw = []byte("ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg8C10PShw+GxCadSlC4nFURIAyvDtgWRvHPabpL5wzDQAAAADAQABAAABAQDORRWgniufZcCLYcl4EgjGWx0w8bMuugm5v14cBWykC54MktKCpB24dOiDTVH0wABGhZTBtAs3QMhskUrvRSvARNdu5ERwbOoW9aU4Mtn+kxZBaP4eFk1luBkEojvAJewNrbkY3N5gJ5O9avpL6UGEu7Z5IZhQmBPIysTLZWBt/ceJEOm7ZZez/cyOl2b+UUa5c6gA7sGaRHC2FYtE4yE6j28d6w2U+JfhJrJYWqBvsROVbvhmFy5b8AfRP2pnzdWfSqbODm+iccbHvZI3jIq/ZsIjZAVlcoR/yxEwwPV2urE0Nnu+TGDO8lyS2DpgSleINe+kH9U9cnu2vxoJ+LdlAAAAAAAAAAAAAAABAAAADGFjY2Vzcy1hZG1pbgAAABAAAAAMYWNjZXNzLWFkbWluAAAAAGAtfCkAAAAAYC4lJQAAAAAAAACdAAAAFnBlcm1pdC1wb3J0LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnRlbGVwb3J0LXJvbGVzAAAALQAAACl7InZlcnNpb24iOiJ2MSIsInJvbGVzIjpbImFjY2Vzcy1hZG1pbiJdfQAAAA90ZWxlcG9ydC10cmFpdHMAAAATAAAAD3sibG9naW5zIjpudWxsfQAAAAAAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQD3VbuNmR0h3tjYIkTVG+HfNByigp6tuNl8XVylIWx7a7ojRA1nJVzAtNs9QQMut8XY+7jxf4Ue83eIaE0e0QKA0GZlRdbSG0zaYzK8CDAcPVN6Ywt8jnGKuuMhBAckGkN/9nyuJHgTAKeHYgdgQgijPuW/D59s3Sk3vCRHryZzJfZDQ52i40B1q2zLvCcQa6UBvPblHAF3usRa08DnsNkgLey1EkkyvBazqt1amH2Epl3uJRHHUtRVSp2a+0597leT58RZNFfFfB9pccPJfD7cn+iiDmN62T/8YslLYl/O6xCJ43Or7wIRHwJ1tY5hq/Bw7LYn29zeBrIkxIvsH8WtAAABFAAAAAxyc2Etc2hhMi01MTIAAAEAhIz0X+wgA0B8Bi67ALpTEA3kHVWaQY3aT+Ig8obof9upq51H0YlySPJph8h6pVzfSJzQYtuGbmzQ/XAGRMn541mnSUGoy0WCHzscyCowaj9VgjFyVpct7Nz98dB3PnRocNTajGGla+AteZEU3d6KXv/CaA4NGwO3k0rYB+UfX0AAaatAwwxnzYehpCvwSqPdrq/OIyb0aljZHADoNRrcnmYDbB1V76WWY6eTCxYGXx1QyU4A8kH9U8pIZ1fVif/i8dSTbBTftTtv5bmO4WUbVscRw/xIqgZ8v6StNLGHPTt/+Zn+iUoiIrwcnpy+yQp2SRTv7+Lg2SSvJO818x3NNg==")
+	sshCert = []byte("ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg8C10PShw+GxCadSlC4nFURIAyvDtgWRvHPabpL5wzDQAAAADAQABAAABAQDORRWgniufZcCLYcl4EgjGWx0w8bMuugm5v14cBWykC54MktKCpB24dOiDTVH0wABGhZTBtAs3QMhskUrvRSvARNdu5ERwbOoW9aU4Mtn+kxZBaP4eFk1luBkEojvAJewNrbkY3N5gJ5O9avpL6UGEu7Z5IZhQmBPIysTLZWBt/ceJEOm7ZZez/cyOl2b+UUa5c6gA7sGaRHC2FYtE4yE6j28d6w2U+JfhJrJYWqBvsROVbvhmFy5b8AfRP2pnzdWfSqbODm+iccbHvZI3jIq/ZsIjZAVlcoR/yxEwwPV2urE0Nnu+TGDO8lyS2DpgSleINe+kH9U9cnu2vxoJ+LdlAAAAAAAAAAAAAAABAAAADGFjY2Vzcy1hZG1pbgAAABAAAAAMYWNjZXNzLWFkbWluAAAAAGAtfCkAAAAAYC4lJQAAAAAAAACdAAAAFnBlcm1pdC1wb3J0LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnRlbGVwb3J0LXJvbGVzAAAALQAAACl7InZlcnNpb24iOiJ2MSIsInJvbGVzIjpbImFjY2Vzcy1hZG1pbiJdfQAAAA90ZWxlcG9ydC10cmFpdHMAAAATAAAAD3sibG9naW5zIjpudWxsfQAAAAAAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQD3VbuNmR0h3tjYIkTVG+HfNByigp6tuNl8XVylIWx7a7ojRA1nJVzAtNs9QQMut8XY+7jxf4Ue83eIaE0e0QKA0GZlRdbSG0zaYzK8CDAcPVN6Ywt8jnGKuuMhBAckGkN/9nyuJHgTAKeHYgdgQgijPuW/D59s3Sk3vCRHryZzJfZDQ52i40B1q2zLvCcQa6UBvPblHAF3usRa08DnsNkgLey1EkkyvBazqt1amH2Epl3uJRHHUtRVSp2a+0597leT58RZNFfFfB9pccPJfD7cn+iiDmN62T/8YslLYl/O6xCJ43Or7wIRHwJ1tY5hq/Bw7LYn29zeBrIkxIvsH8WtAAABFAAAAAxyc2Etc2hhMi01MTIAAAEAhIz0X+wgA0B8Bi67ALpTEA3kHVWaQY3aT+Ig8obof9upq51H0YlySPJph8h6pVzfSJzQYtuGbmzQ/XAGRMn541mnSUGoy0WCHzscyCowaj9VgjFyVpct7Nz98dB3PnRocNTajGGla+AteZEU3d6KXv/CaA4NGwO3k0rYB+UfX0AAaatAwwxnzYehpCvwSqPdrq/OIyb0aljZHADoNRrcnmYDbB1V76WWY6eTCxYGXx1QyU4A8kH9U8pIZ1fVif/i8dSTbBTftTtv5bmO4WUbVscRw/xIqgZ8v6StNLGHPTt/+Zn+iUoiIrwcnpy+yQp2SRTv7+Lg2SSvJO818x3NNg==")
 
 	sshCACert = []byte("@cert-authority *.example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMIgxZpT5362npj0x6NQA76IB73bcK85K8cEyKURuHtFC83RjBzvzqtUz6X02+6ohVZiR2MdmsXkCLznzwEIZ0NtoxgnLTZLmduPLeAuYW2vIFpd0G17y6Yog9vxhQ0BLdlhU5Y3JYjRYjmQMfe1iD/RXWD6rEvgWlz+c3HMQR33JqkVIEFH34upfkC2RQG3TXjMe5t14l3yCTtyF5YGzN7+6z/4+/EDto/F3zVtSEp+k8XE/m0ddTGo7usa8ErAom31RwrgkNRmgJmPleDwEflybEsgGKApJXkfFxmG2wu20JoEt/CFjY3fIIa/5aqIGJPpMH4aEdLcj/iyNCog8D type=host")
 

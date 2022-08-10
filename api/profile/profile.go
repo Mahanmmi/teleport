@@ -106,7 +106,7 @@ func (p *Profile) Name() string {
 
 // TLSConfig returns the profile's associated TLSConfig.
 func (p *Profile) TLSConfig() (*tls.Config, error) {
-	tlsCert, err := keys.LoadX509KeyPair(p.TLSCertPath(), p.UserKeyPath())
+	cert, err := keys.LoadX509KeyPair(p.TLSCertPath(), p.UserKeyPath())
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -117,7 +117,7 @@ func (p *Profile) TLSConfig() (*tls.Config, error) {
 	}
 
 	return &tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
+		Certificates: []tls.Certificate{cert},
 		RootCAs:      pool,
 	}, nil
 }
@@ -201,7 +201,7 @@ func (p *Profile) SSHClientConfig() (*ssh.ClientConfig, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	ssh, err := sshutils.ProxyClientSSHConfigWithCAs(sshCert, priv, [][]byte{caCerts})
+	ssh, err := sshutils.ProxyClientSSHConfig(sshCert, priv, caCerts)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

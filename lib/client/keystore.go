@@ -139,7 +139,7 @@ func (fs *FSLocalKeyStore) AddKey(key *Key) error {
 		return trace.Wrap(err)
 	}
 
-	if err := fs.writeBytes(key.PrivateKeyDataPEM(), fs.UserKeyPath(key.KeyIndex)); err != nil {
+	if err := fs.writeBytes(key.PrivateKeyPEM(), fs.UserKeyPath(key.KeyIndex)); err != nil {
 		return trace.Wrap(err)
 	}
 
@@ -153,12 +153,11 @@ func (fs *FSLocalKeyStore) AddKey(key *Key) error {
 			if err := fs.writeBytes(ppkFile, fs.PPKFilePath(key.KeyIndex)); err != nil {
 				return trace.Wrap(err)
 			}
-		} else if trace.IsBadParameter(err) {
-			// PPKFile can only be generated from an RSA private key.
-			fs.log.WithError(err).Debugf("Failed to convert private key to PPK-formatted keypair")
-		} else {
+		} else if !trace.IsBadParameter(err) {
 			return trace.Wrap(err)
 		}
+		// PPKFile can only be generated from an RSA private key.
+		fs.log.WithError(err).Debugf("Failed to convert private key to PPK-formatted keypair.")
 	}
 
 	// Store per-cluster key data.
