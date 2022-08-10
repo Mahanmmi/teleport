@@ -40,8 +40,6 @@ const (
 	fileExtSSHCert = "-cert.pub"
 	// fileExtPPK is the suffix/extension of a file where an SSH keypair is stored in PuTTY PPK format.
 	fileExtPPK = ".ppk"
-	// fileExtPub is the extension of a file where a public key is stored.
-	fileExtPub = ".pub"
 	// fileExtLocalCA is the extension of a file where a self-signed localhost CA cert is stored.
 	fileExtLocalCA = "-localca.pem"
 	// appDirSuffix is the suffix of a sub-directory where app TLS certs are stored.
@@ -65,7 +63,6 @@ const (
 //    ├── one.example.com              --> Proxy hostname
 //    │   ├── certs.pem                --> TLS CA certs for the Teleport CA
 //    │   ├── foo                      --> RSA Private Key for user "foo"
-//    │   ├── foo.pub                  --> Public Key
 //    │   ├── foo.ppk                  --> PuTTY PPK-formatted keypair for user "foo"
 //    │   ├── foo-x509.pem             --> TLS client certificate for Auth Server
 //    │   ├── foo-ssh                  --> SSH certs for user "foo"
@@ -135,14 +132,6 @@ func UserKeyPath(baseDir, proxy, username string) string {
 // <baseDir>/keys/<proxy>/<username>-x509.pem
 func TLSCertPath(baseDir, proxy, username string) string {
 	return filepath.Join(ProxyKeyDir(baseDir, proxy), username+fileExtTLSCert)
-}
-
-// SSHCAsPath returns the path to the users's SSH CA's certificates
-// for the given proxy.
-//
-// <baseDir>/keys/<proxy>/<username>.pub
-func SSHCAsPath(baseDir, proxy, username string) string {
-	return filepath.Join(ProxyKeyDir(baseDir, proxy), username+fileExtPub)
 }
 
 // CAsDir returns path to trusted clusters certificates directory.

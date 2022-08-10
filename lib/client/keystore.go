@@ -139,9 +139,6 @@ func (fs *FSLocalKeyStore) AddKey(key *Key) error {
 		return trace.Wrap(err)
 	}
 
-	if err := fs.writeBytes(key.SSHPublicKeyPEM(), fs.publicKeyPath(key.KeyIndex)); err != nil {
-		return trace.Wrap(err)
-	}
 	if err := fs.writeBytes(key.PrivateKeyDataPEM(), fs.UserKeyPath(key.KeyIndex)); err != nil {
 		return trace.Wrap(err)
 	}
@@ -217,7 +214,6 @@ func (fs *FSLocalKeyStore) writeBytes(bytes []byte, fp string) error {
 func (fs *FSLocalKeyStore) DeleteKey(idx KeyIndex) error {
 	files := []string{
 		fs.UserKeyPath(idx),
-		fs.publicKeyPath(idx),
 		fs.tlsCertPath(idx),
 	}
 	for _, fn := range files {
@@ -308,15 +304,6 @@ func (fs *FSLocalKeyStore) GetKey(idx KeyIndex, opts ...CertOption) (*Key, error
 		fs.log.Error(err)
 		return nil, trace.ConvertSystemError(err)
 	}
-
-	// TODO (Joerger): what benefit does storing the public key provide?
-	// should we just remove it? Use it for validation?
-	//
-	// pub, err := os.ReadFile(fs.publicKeyPath(idx))
-	// if err != nil {
-	// 	fs.log.Error(err)
-	// 	return nil, trace.ConvertSystemError(err)
-	// }
 
 	key := &Key{
 		KeyIndex:   idx,
@@ -546,11 +533,6 @@ func (fs *fsLocalNonSessionKeyStore) knownHostsPath() string {
 // UserKeyPath returns the private key path for the given KeyIndex.
 func (fs *fsLocalNonSessionKeyStore) UserKeyPath(idx KeyIndex) string {
 	return keypaths.UserKeyPath(fs.KeyDir, idx.ProxyHost, idx.Username)
-}
-
-// publicKeyPath returns the public key path for the given KeyIndex.
-func (fs *fsLocalNonSessionKeyStore) publicKeyPath(idx KeyIndex) string {
-	return keypaths.SSHCAsPath(fs.KeyDir, idx.ProxyHost, idx.Username)
 }
 
 // tlsCertPath returns the TLS certificate path given KeyIndex.
