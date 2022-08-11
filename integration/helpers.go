@@ -131,14 +131,14 @@ func createAgent(me *user.User, key *client.Key) (*teleagent.AgentServer, string
 		return nil, "", "", trace.Wrap(err)
 	}
 
-	agentKey := agentKeys[0]
-	agentKey.Comment = ""
-
-	// create a (unstarted) agent and add the key to it
+	// create a (unstarted) agent and add the agent key(s) to it
 	keyring := agent.NewKeyring()
-	if err := keyring.Add(agentKey); err != nil {
-		return nil, "", "", trace.Wrap(err)
+	for _, agentKey := range agentKeys {
+		if err := keyring.Add(agentKey); err != nil {
+			return nil, "", "", trace.Wrap(err)
+		}
 	}
+
 	teleAgent := teleagent.NewServer(func() (teleagent.Agent, error) {
 		return teleagent.NopCloser(keyring), nil
 	})

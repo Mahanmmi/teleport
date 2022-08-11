@@ -36,8 +36,7 @@ func TestParsePrivateKey(t *testing.T) {
 			desc:   "invalid PEM",
 			keyPEM: []byte(`non-pem data`),
 			assertError: func(t require.TestingT, err error, i ...interface{}) {
-				require.Error(t, err)
-				require.True(t, trace.IsBadParameter(err))
+				require.True(t, trace.IsBadParameter(err), "expected trace.BadParameter, got %T", err)
 			},
 		},
 		{
@@ -46,8 +45,7 @@ func TestParsePrivateKey(t *testing.T) {
 -----END INVALID KEY-----
 `),
 			assertError: func(t require.TestingT, err error, i ...interface{}) {
-				require.Error(t, err)
-				require.True(t, trace.IsBadParameter(err))
+				require.True(t, trace.IsBadParameter(err), "expected trace.BadParameter, got %T", err)
 			},
 		},
 		{
