@@ -96,11 +96,7 @@ type Key struct {
 // GenerateRSAKey generates a new unsigned key. Such key must be signed by a
 // Teleport CA (auth server) before it becomes useful.
 func GenerateRSAKey() (*Key, error) {
-	priv, err := native.GenerateRSAPrivateKey()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	pk, err := keys.NewRSAPrivateKey(priv)
+	pk, err := native.GeneratePrivateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

@@ -34,6 +34,7 @@ import (
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/wrappers"
 	apiutils "github.com/gravitational/teleport/api/utils"
+	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/modules"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/utils"
@@ -54,8 +55,9 @@ var precomputedKeys = make(chan *rsa.PrivateKey, 25)
 // startPrecomputeOnce is used to start the background task that precomputes key pairs.
 var startPrecomputeOnce sync.Once
 
+// GenerateKeyPair generates a new RSA key pair.
 func GenerateKeyPair() ([]byte, []byte, error) {
-	priv, err := GenerateRSAPrivateKey()
+	priv, err := generateRSAPrivateKey()
 	if err != nil {
 		return nil, nil, trace.Wrap(err)
 	}
@@ -75,21 +77,26 @@ func GenerateKeyPair() ([]byte, []byte, error) {
 	return privPEM, pubPEM, nil
 }
 
-func GenerateRSAPrivateKey() (*rsa.PrivateKey, error) {
+// GeneratePrivateKey generates a new RSA private key.
+func GeneratePrivateKey() (keys.PrivateKey, error) {
+	rsaKey, err := generateRSAPrivateKey()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return keys.NewRSAPrivateKey(rsaKey)
+}
+
+func generateRSAPrivateKey() (*rsa.PrivateKey, error) {
 	select {
 	case k := <-precomputedKeys:
 		return k, nil
 	default:
-		return generateRSAPrivateKey()
+		rsaKeyPair, err := rsa.GenerateKey(rand.Reader, constants.RSAKeySize)
+		if err != nil {
+			return nil, err
+		}
+		return rsaKeyPair, nil
 	}
-}
-
-func generateRSAPrivateKey() (*rsa.PrivateKey, error) {
-	rsaKeyPair, err := rsa.GenerateKey(rand.Reader, constants.RSAKeySize)
-	if err != nil {
-		return nil, err
-	}
-	return rsaKeyPair, nil
 }
 
 func precomputeKeys() {

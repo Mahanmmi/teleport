@@ -66,7 +66,7 @@ func MakeTestServerTLSConfig(config TestServerConfig) (*tls.Config, error) {
 	if cn == "" {
 		cn = "localhost"
 	}
-	privateKey, _, err := testauthority.New().GenerateKeyPair()
+	privateKey, err := testauthority.New().GeneratePrivateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -85,7 +85,8 @@ func MakeTestServerTLSConfig(config TestServerConfig) (*tls.Config, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	cert, err := tls.X509KeyPair(resp.Cert, privateKey)
+
+	cert, err := privateKey.TLSCertificate(resp.Cert)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
