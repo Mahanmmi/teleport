@@ -39,7 +39,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/go-piv/piv-go/piv"
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/client/webclient"
@@ -357,24 +356,6 @@ type Config struct {
 	//	on - attempt to load keys into agent
 	//	off - do not attempt to load keys into agent
 	AddKeysToAgent string
-
-	// PIVLogin specifies whether to use a PIV device to generate a private key during login.
-	PIVLogin bool
-
-	// PIVYubikeySerial specifies a specific Yubikey device by serial number to use
-	// during PIV login.
-	PIVYubikeySerial string
-
-	// PIVSlot specifies what PIV slot to generate a private key on during PIV login.
-	PIVSlot piv.Slot
-
-	// PIVPINPolicy specifies how often the user needs to provide their PIV PIN to access
-	// the PIV private key.
-	PIVPINPolicy piv.PINPolicy
-
-	// PIVPINPolicy specifies how often the user needs to touch their PIV device to access
-	// the PIV private key.
-	PIVTouchPolicy piv.TouchPolicy
 
 	// EnableEscapeSequences will scan Stdin for SSH escape sequences during
 	// command/shell execution. This also requires Stdin to be an interactive
@@ -3344,8 +3325,11 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 }
 
 func (tc *TeleportClient) generateKey() (*Key, error) {
-	if tc.PIVLogin {
-		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, tc.PIVYubikeySerial, tc.PIVSlot, tc.PIVPINPolicy, tc.PIVTouchPolicy)
+	// TODO (Joerger): use PIV if "require_session_mfa: hardware_key"
+	if os.Getenv("TSH_PIV") != "" {
+		// TODO (Joerger): get yubikey serial number from user's configured mfa device
+		var serialNumber string
+		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, serialNumber)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}

@@ -47,7 +47,6 @@ import (
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/api/types/wrappers"
 	apiutils "github.com/gravitational/teleport/api/utils"
-	"github.com/gravitational/teleport/api/utils/keys"
 	apisshutils "github.com/gravitational/teleport/api/utils/sshutils"
 	"github.com/gravitational/teleport/lib/asciitable"
 	"github.com/gravitational/teleport/lib/auth"
@@ -71,7 +70,6 @@ import (
 	"github.com/gravitational/teleport/tool/common"
 
 	"github.com/ghodss/yaml"
-	"github.com/go-piv/piv-go/piv"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
@@ -289,24 +287,6 @@ type CLIConf struct {
 
 	// AddKeysToAgent specifies the behavior of how certs are handled.
 	AddKeysToAgent string
-
-	// PIVLogin specifies whether to use a PIV device to generate a private key during login.
-	PIVLogin bool
-
-	// PIVYubikeySerial specifies a specific Yubikey device by serial number to use
-	// during PIV login.
-	PIVYubikeySerial string
-
-	// PIVSlot specifies what PIV slot to generate a private key on during PIV login.
-	PIVSlot string
-
-	// PIVPINPolicy specifies how often the user needs to provide their PIV PIN to access
-	// the PIV private key.
-	PIVPINPolicy string
-
-	// PIVPINPolicy specifies how often the user needs to touch their PIV device to access
-	// the PIV private key.
-	PIVTouchPolicy string
 
 	// EnableEscapeSequences will scan stdin for SSH escape sequences during
 	// command/shell execution. This also requires stdin to be an interactive
@@ -738,11 +718,6 @@ func Run(ctx context.Context, args []string, opts ...cliOption) error {
 	login.Flag("browser", browserHelp).StringVar(&cf.Browser)
 	login.Flag("kube-cluster", "Name of the Kubernetes cluster to login to").StringVar(&cf.KubernetesCluster)
 	login.Flag("verbose", "Show extra status information").Short('v').BoolVar(&cf.Verbose)
-	login.Flag("piv", "Use a PIV-compatible smart card to generate and store private key data for your login session.").BoolVar(&cf.PIVLogin)
-	login.Flag("piv-yubikey-serial", "Specify a yubikey by serial number to use for PIV login.").StringVar(&cf.PIVYubikeySerial)
-	login.Flag("piv-slot", "Specify which PIV slot to use for PIV login. Valid values are 9a, 9c-9e, and 82-95.").StringVar(&cf.PIVSlot)
-	login.Flag("piv-pin-policy", fmt.Sprintf("Control how often you need to enter your PIV PIN to access PIV private key data. Valid values are %v.", keys.PIVPINPolicyOptions)).StringVar(&cf.PIVPINPolicy)
-	login.Flag("piv-touch-policy", fmt.Sprintf("Control how often you need to touch your PIV device to access PIV private key data. Valid values are %v.", keys.PIVTouchPolicyOptions)).StringVar(&cf.PIVTouchPolicy)
 	login.Alias(loginUsageFooter)
 
 	// logout deletes obtained session certificates in ~/.tsh
@@ -3099,36 +3074,6 @@ func makeClientForProxy(cf *CLIConf, proxy string, useProfileLogin bool) (*clien
 	c.AddKeysToAgent = cf.AddKeysToAgent
 	if !cf.UseLocalSSHAgent {
 		c.AddKeysToAgent = client.AddKeysToAgentNo
-	}
-
-	// If any PIV login flags are provided, setup PIV config from set flags and defaults.
-	if cf.PIVLogin || c.PIVYubikeySerial != "" || cf.PIVSlot != "" || cf.PIVPINPolicy != "" || cf.PIVTouchPolicy != "" {
-		c.PIVLogin = true
-		c.PIVYubikeySerial = cf.PIVYubikeySerial
-
-		c.PIVSlot = piv.SlotAuthentication
-		if cf.PIVSlot != "" {
-			c.PIVSlot, err = keys.ParsePIVSlot(cf.PIVSlot)
-			if err != nil {
-				return nil, trace.Wrap(err)
-			}
-		}
-
-		c.PIVPINPolicy = piv.PINPolicyOnce
-		if cf.PIVPINPolicy != "" {
-			c.PIVPINPolicy, err = keys.ParsePIVPINPolicy(cf.PIVPINPolicy)
-			if err != nil {
-				return nil, trace.Wrap(err)
-			}
-		}
-
-		c.PIVTouchPolicy = piv.TouchPolicyCached
-		if cf.PIVTouchPolicy != "" {
-			c.PIVTouchPolicy, err = keys.ParsePIVTouchPolicy(cf.PIVTouchPolicy)
-			if err != nil {
-				return nil, trace.Wrap(err)
-			}
-		}
 	}
 
 	c.EnableEscapeSequences = cf.EnableEscapeSequences

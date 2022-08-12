@@ -14,13 +14,10 @@ limitations under the License.
 package keys
 
 import (
-	"context"
 	"crypto"
 	"crypto/tls"
 	"encoding/pem"
-	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,41 +28,41 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
+var (
+	defaultSlot        = piv.SlotAuthentication
+	defaultPINPolicy   = piv.PINPolicyNever
+	defaultTouchPolicy = piv.TouchPolicyNever
+)
+
 // GenerateYubikeyPrivateKey connects to the yubikey with the given serial number
 // and generates a new private key on the given PIV slot with the given policies.
-func GenerateYubikeyPrivateKey(serialNumber string, slot piv.Slot, pinPolicy piv.PINPolicy, touchPolicy piv.TouchPolicy) (*YubikeyPrivateKey, error) {
+func GenerateYubikeyPrivateKey(serialNumber string) (*YubikeyPrivateKey, error) {
 	y, err := findYubikey(serialNumber)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return y.generatePrivateKey(slot, pinPolicy, touchPolicy)
+	return y.generatePrivateKey()
 }
 
 // YubikeyPrivateKey is a Yubikey PIV private key. Cryptographical operations open
 // a new temporary connection to the PIV card to perform the operation.
 type YubikeyPrivateKey struct {
 	*yubikey
-	pivSlot     piv.Slot
-	pub         crypto.PublicKey
-	sshPub      ssh.PublicKey
-	pinPolicy   piv.PINPolicy
-	touchPolicy piv.TouchPolicy
+	pub    crypto.PublicKey
+	sshPub ssh.PublicKey
 }
 
-func newYubikeyPrivateKey(y *yubikey, pub crypto.PublicKey, slot piv.Slot, pinPolicy piv.PINPolicy, touchPolicy piv.TouchPolicy) (*YubikeyPrivateKey, error) {
+func newYubikeyPrivateKey(y *yubikey, pub crypto.PublicKey) (*YubikeyPrivateKey, error) {
 	sshPub, err := ssh.NewPublicKey(pub)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	return &YubikeyPrivateKey{
-		yubikey:     y,
-		pivSlot:     slot,
-		pub:         pub,
-		sshPub:      sshPub,
-		pinPolicy:   pinPolicy,
-		touchPolicy: touchPolicy,
+		yubikey: y,
+		pub:     pub,
+		sshPub:  sshPub,
 	}, nil
 }
 
@@ -107,28 +104,9 @@ func (y *YubikeyPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.Sign
 	}
 	defer yk.Close()
 
-	auth := piv.KeyAuth{PIN: piv.DefaultPIN}
-	privateKey, err := yk.PrivateKey(y.pivSlot, y.pub, auth)
+	privateKey, err := yk.PrivateKey(defaultSlot, y.pub, piv.KeyAuth{})
 	if err != nil {
 		return nil, trace.Wrap(err)
-	}
-
-	var touchPrompt = "Tap your PIV key"
-	switch y.touchPolicy {
-	case piv.TouchPolicyAlways:
-		fmt.Fprintln(os.Stderr, touchPrompt)
-	case piv.TouchPolicyCached:
-		// Wait a split second before prompting the user for touch. If the user's touch
-		// is cached, then the Sign will complete before we prompt the user.
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
-		defer cancel()
-
-		go func() {
-			<-ctx.Done()
-			if ctx.Err() == context.DeadlineExceeded {
-				fmt.Fprintln(os.Stderr, touchPrompt)
-			}
-		}()
 	}
 
 	return privateKey.(crypto.Signer).Sign(rand, digest, opts)
@@ -156,7 +134,7 @@ func (y *YubikeyPrivateKey) PrivateKeyPEM() []byte {
 var keyDataSeparator = "+"
 
 func (y *YubikeyPrivateKey) keyData() string {
-	return strings.Join([]string{strconv.FormatUint(uint64(y.serialNumber), 10), y.pivSlot.String()}, keyDataSeparator)
+	return strings.Join([]string{strconv.FormatUint(uint64(y.serialNumber), 10), defaultSlot.String()}, keyDataSeparator)
 }
 
 // SSHPublicKey returns the ssh.PublicKey representiation of the public key.
@@ -208,24 +186,27 @@ func newYubikey(card string) (*yubikey, error) {
 }
 
 // generatePrivateKey generates a new private key from the given PIV slot with the given PIV policies.
-func (y *yubikey) generatePrivateKey(slot piv.Slot, pinPolicy piv.PINPolicy, touchPolicy piv.TouchPolicy) (*YubikeyPrivateKey, error) {
+func (y *yubikey) generatePrivateKey() (*YubikeyPrivateKey, error) {
 	yk, err := y.open()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	defer yk.Close()
 
-	managementKey := piv.DefaultManagementKey
-	pub, err := yk.GenerateKey(managementKey, slot, piv.Key{
-		Algorithm:   piv.AlgorithmEC256,
-		PINPolicy:   pinPolicy,
-		TouchPolicy: touchPolicy,
-	})
+	pub, err := yk.GenerateKey(
+		piv.DefaultManagementKey,
+		defaultSlot,
+		piv.Key{
+			Algorithm:   piv.AlgorithmEC256,
+			PINPolicy:   defaultPINPolicy,
+			TouchPolicy: defaultTouchPolicy,
+		},
+	)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return newYubikeyPrivateKey(y, pub, slot, pinPolicy, touchPolicy)
+	return newYubikeyPrivateKey(y, pub)
 }
 
 // getPrivateKey gets an existing private key from the given PIV slot.
@@ -246,12 +227,12 @@ func (y *yubikey) getPrivateKey(slot piv.Slot) (*YubikeyPrivateKey, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	attestation, err := piv.Verify(attestationCert, slotCert)
+	_, err = piv.Verify(attestationCert, slotCert)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return newYubikeyPrivateKey(y, slotCert.PublicKey, slot, attestation.PINPolicy, attestation.TouchPolicy)
+	return newYubikeyPrivateKey(y, slotCert.PublicKey)
 }
 
 // open a connection to yubikey PIV module. The returned connection should be closed once
@@ -263,7 +244,7 @@ func (y *yubikey) open() (yk *piv.YubiKey, err error) {
 		return strings.Contains(err.Error(), retryError)
 	}
 
-	var maxRetries int = 10
+	var maxRetries int = 20
 	for i := 0; i < maxRetries; i++ {
 		yk, err = piv.Open(y.card)
 		if err == nil {
@@ -274,7 +255,7 @@ func (y *yubikey) open() (yk *piv.YubiKey, err error) {
 			return nil, trace.Wrap(err)
 		}
 
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 50)
 	}
 
 	return nil, trace.Wrap(err)

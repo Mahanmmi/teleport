@@ -27,10 +27,10 @@ const (
 
 // GeneratePIVPrivateKey generates a new PrivateKey on the given slot of
 // the card identified by cardType and uniqueCardID.
-func GeneratePIVPrivateKey(cardType, uniqueCardID string, slot piv.Slot, pinPolicy piv.PINPolicy, touchPolicy piv.TouchPolicy) (PrivateKey, error) {
+func GeneratePIVPrivateKey(cardType, uniqueCardID string) (PrivateKey, error) {
 	switch cardType {
 	case PIVCardTypeYubikey:
-		return GenerateYubikeyPrivateKey(uniqueCardID, slot, pinPolicy, touchPolicy)
+		return GenerateYubikeyPrivateKey(uniqueCardID)
 	default:
 		return nil, trace.BadParameter("PIV device %q not supported", cardType)
 	}
@@ -59,49 +59,4 @@ func ParsePIVSlot(slotName string) (piv.Slot, error) {
 		return piv.Slot{}, trace.BadParameter("slot %q does not exist", slotName)
 	}
 	return retiredSlot, nil
-}
-
-const (
-	// PIVPolicyNever will never enforce the PIV policy.
-	PIVPolicyNever = "never"
-	// PIVPolicyOnce wwill enforce the PIV policy once per connection.
-	PIVPolicyOnce = "once"
-	// PIVPolicyCached will enforce the PIV policy and cache it for 15 seconds.
-	PIVPolicyCached = "cached"
-	// PIVPolicyAlways will always enforce the PIV policy.
-	PIVPolicyAlways = "always"
-)
-
-// PIVPINPolicyOptions is the set of PIN Policy options available.
-var PIVPINPolicyOptions = []string{PIVPolicyNever, PIVPolicyOnce, PIVPolicyAlways}
-
-// ParsePIVPINPolicy parse a piv.PINPolicy from a string.
-func ParsePIVPINPolicy(policy string) (piv.PINPolicy, error) {
-	switch policy {
-	case PIVPolicyNever:
-		return piv.PINPolicyNever, nil
-	case PIVPolicyOnce:
-		return piv.PINPolicyOnce, nil
-	case PIVPolicyAlways:
-		return piv.PINPolicyAlways, nil
-	default:
-		return 0, trace.BadParameter("invalid yubikey pin policy  %q, must be one of %v", policy, PIVPINPolicyOptions)
-	}
-}
-
-// PIVTouchPolicyOptions is the set of touch Policy options available.
-var PIVTouchPolicyOptions = []string{PIVPolicyNever, PIVPolicyCached, PIVPolicyAlways}
-
-// ParsePIVTouchPolicy parse a piv.TouchPolicy from a string.
-func ParsePIVTouchPolicy(policy string) (piv.TouchPolicy, error) {
-	switch policy {
-	case PIVPolicyNever:
-		return piv.TouchPolicyNever, nil
-	case PIVPolicyCached:
-		return piv.TouchPolicyCached, nil
-	case PIVPolicyAlways:
-		return piv.TouchPolicyAlways, nil
-	default:
-		return 0, trace.BadParameter("invalid yubikey touch policy %q, must be one of %v", policy, PIVTouchPolicyOptions)
-	}
 }

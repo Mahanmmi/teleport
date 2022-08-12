@@ -20,7 +20,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-piv/piv-go/piv"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,11 +34,11 @@ func TestYubikeyPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate a new YubikeyPrivateKey
-	priv1, err := y.generatePrivateKey(piv.SlotAuthentication, piv.PINPolicyNever, piv.TouchPolicyNever)
+	priv1, err := y.generatePrivateKey()
 	require.NoError(t, err)
 
 	// Generate another YubikeyPrivateKey and confirm the key changed
-	priv2, err := y.generatePrivateKey(piv.SlotAuthentication, piv.PINPolicyNever, piv.TouchPolicyNever)
+	priv2, err := y.generatePrivateKey()
 	require.NoError(t, err)
 	require.False(t, priv2.Equal(priv1))
 
