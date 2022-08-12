@@ -43,10 +43,10 @@ type PrivateKey interface {
 
 	// PrivateKeyPEM returns PEM encoded private key data. This may be data necessary
 	// to retrieve the key, such as a Yubikey serial number and slot, or it can be a
-	// PKCS marshalled private key.
+	// PKCS marshaled private key.
 	//
 	// The resulting PEM encoded data should only be decoded with ParsePrivateKey to
-	// prevent errors from parsing non PKCS marshalled keys, such as a PIV key.
+	// prevent errors from parsing non PKCS marshaled keys, such as a PIV key.
 	PrivateKeyPEM() []byte
 
 	// SSHPublicKey returns the ssh.PublicKey representiation of the public key.

@@ -17,6 +17,7 @@ limitations under the License.
 package keys
 
 import (
+	"crypto"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -47,6 +48,17 @@ func NewRSAPrivateKey(priv *rsa.PrivateKey) (*RSAPrivateKey, error) {
 		PrivateKey: priv,
 		sshPub:     sshPub,
 	}, nil
+}
+
+// Equal returns whether the given private key is equal to this key.
+func (r *RSAPrivateKey) Equal(x crypto.PrivateKey) bool {
+	switch priv := x.(type) {
+	case *RSAPrivateKey:
+		return r.PrivateKey.Equal(priv.PrivateKey)
+	case *rsa.PrivateKey:
+		return r.PrivateKey.Equal(priv)
+	}
+	return false
 }
 
 // PrivateKeyPEM returns the PEM encoded RSA private key.
