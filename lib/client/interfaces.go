@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/gravitational/teleport"
@@ -94,9 +95,35 @@ type Key struct {
 	TrustedCA []auth.TrustedCerts
 }
 
+// GenerateKey generates a new unsigned client key.
+func GenerateKey() (*Key, error) {
+	// TODO (Joerger): use PIV if "require_session_mfa: hardware_key"
+	if os.Getenv("TSH_PIV") != "" {
+		log.Debugf("Generating a new Client Key (PIV)")
+		// TODO (Joerger): get yubikey serial number from user's configured mfa device
+		var serialNumber string
+		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, serialNumber)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return NewKey(priv), nil
+	}
+	log.Debugf("Generating a new Client Key (RSA)")
+	return GenerateRSAKey()
+}
+
+// GenerateRSAKey generates a new unsigned rsa client key.
+func GenerateRSAPrivateKey() (keys.PrivateKey, error) {
+	pk, err := native.GeneratePrivateKey()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return pk, nil
+}
+
 // GenerateRSAKey generates a new unsigned key.
 func GenerateRSAKey() (*Key, error) {
-	pk, err := native.GeneratePrivateKey()
+	pk, err := GenerateRSAPrivateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

@@ -52,7 +52,6 @@ import (
 	"github.com/gravitational/teleport/api/types/wrappers"
 	apiutils "github.com/gravitational/teleport/api/utils"
 	"github.com/gravitational/teleport/api/utils/keypaths"
-	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/auth"
 	wancli "github.com/gravitational/teleport/lib/auth/webauthncli"
 	"github.com/gravitational/teleport/lib/client/terminal"
@@ -3245,7 +3244,7 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 	}
 
 	// generate a new private key. the public key will be signed via proxy if client's password+OTP are valid
-	key, err := tc.generateKey()
+	key, err := GenerateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -3322,21 +3321,6 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 	}
 
 	return key, nil
-}
-
-func (tc *TeleportClient) generateKey() (*Key, error) {
-	// TODO (Joerger): use PIV if "require_session_mfa: hardware_key"
-	if os.Getenv("TSH_PIV") != "" {
-		// TODO (Joerger): get yubikey serial number from user's configured mfa device
-		var serialNumber string
-		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, serialNumber)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return NewKey(priv)
-	}
-
-	return GenerateRSAKey()
 }
 
 func (tc *TeleportClient) pwdlessLogin(ctx context.Context, pubKey []byte) (*auth.SSHLoginResponse, error) {

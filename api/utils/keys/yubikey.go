@@ -244,7 +244,7 @@ func (y *yubikey) open() (yk *piv.YubiKey, err error) {
 		return strings.Contains(err.Error(), retryError)
 	}
 
-	var maxRetries int = 20
+	var maxRetries int = 100
 	for i := 0; i < maxRetries; i++ {
 		yk, err = piv.Open(y.card)
 		if err == nil {
@@ -255,7 +255,7 @@ func (y *yubikey) open() (yk *piv.YubiKey, err error) {
 			return nil, trace.Wrap(err)
 		}
 
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	return nil, trace.Wrap(err)
