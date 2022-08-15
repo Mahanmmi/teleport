@@ -195,22 +195,11 @@ type remoteCommandProxy struct {
 
 func (s *remoteCommandProxy) Close() error {
 	if s.conn != nil {
-		return trace.NewAggregate(
-			closeStream(s.stderrStream),
-			closeStream(s.stdoutStream),
-			closeStream(s.stdinStream),
-			s.conn.Close(),
-		)
+		return s.conn.Close()
 	}
 	return nil
 }
 
-func closeStream(st io.Closer) error {
-	if st != nil {
-		return st.Close()
-	}
-	return nil
-}
 func (s *remoteCommandProxy) options() remotecommand.StreamOptions {
 	opts := remotecommand.StreamOptions{
 		Stdout: s.stdoutStream,

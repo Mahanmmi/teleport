@@ -125,22 +125,13 @@ func createWebSocketStreams(req remoteCommandRequest) (*remoteCommandProxy, erro
 	// use of closed network connection
 	// Error on socket receive: read tcp 192.168.1.236:3027->192.168.1.236:57842: use of closed network connection
 	if !req.stdin {
-		if proxy.stdinStream != nil {
-			proxy.stdinStream.Close()
-		}
 		proxy.stdinStream = nil
 	}
 	if !req.stdout {
-		if proxy.stdoutStream != nil {
-			proxy.stdoutStream.Close()
-		}
 		proxy.stdoutStream = nil
 	}
 
 	if !req.stderr {
-		if proxy.stderrStream != nil {
-			proxy.stderrStream.Close()
-		}
 		proxy.stderrStream = nil
 	}
 
