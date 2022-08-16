@@ -3079,19 +3079,14 @@ func (a *ServerWithRoles) GetSessionEvents(namespace string, sid session.ID, aft
 	}
 
 	// emit a session recording view event for the audit log
-	user, err := a.GetCurrentUser(context.Background())
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	if a.authServer.emitter.EmitAuditEvent(a.authServer.closeCtx, &apievents.SessionRecordingAccess{
+	if err := a.authServer.emitter.EmitAuditEvent(a.authServer.closeCtx, &apievents.SessionRecordingAccess{
 		Metadata: apievents.Metadata{
 			Type: events.SessionRecordingAccessEvent,
 			Code: events.SessionRecordingAccessCode,
 		},
 		SessionID: sid.String(),
 		UserMetadata: apievents.UserMetadata{
-			User: user.GetName(),
+			User: a.context.User.GetName(),
 		},
 	}); err != nil {
 		return nil, trace.Wrap(err)
@@ -4492,11 +4487,6 @@ func (a *ServerWithRoles) StreamSessionEvents(ctx context.Context, sessionID ses
 	shouldEmitAuditEvent := !isBuiltinRole
 
 	if shouldEmitAuditEvent {
-		user, err := a.GetCurrentUser(context.Background())
-		if err != nil {
-			return createErrorChannel(err)
-		}
-
 		if err := a.authServer.emitter.EmitAuditEvent(a.authServer.closeCtx, &apievents.SessionRecordingAccess{
 			Metadata: apievents.Metadata{
 				Type: events.SessionRecordingAccessEvent,
@@ -4504,7 +4494,7 @@ func (a *ServerWithRoles) StreamSessionEvents(ctx context.Context, sessionID ses
 			},
 			SessionID: sessionID.String(),
 			UserMetadata: apievents.UserMetadata{
-				User: user.GetName(),
+				User: a.context.User.GetName(),
 			},
 		}); err != nil {
 			return createErrorChannel(err)
