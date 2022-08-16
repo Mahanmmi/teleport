@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -585,4 +586,15 @@ func (k *Key) RootClusterName() (string, error) {
 		return "", trace.NotFound("failed to extract root cluster name from Teleport TLS cert")
 	}
 	return clusterName, nil
+}
+
+// Equal returns whether the given private key is equal to this key's private key.
+func (k *Key) Equal(x crypto.PrivateKey) bool {
+	switch priv := x.(type) {
+	case *Key:
+		return k.PrivateKey.Equal(priv.PrivateKey)
+	case keys.PrivateKey:
+		return k.PrivateKey.Equal(priv)
+	}
+	return false
 }
