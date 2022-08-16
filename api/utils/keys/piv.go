@@ -26,7 +26,8 @@ const (
 )
 
 // GeneratePIVPrivateKey generates a new PrivateKey on the given slot of
-// the card identified by cardType and uniqueCardID.
+// the card identified by cardType and uniqueCardID. If a cardID isn't
+// specified, then the first PIV key found for the given cardType will be used.
 func GeneratePIVPrivateKey(cardType, uniqueCardID string) (PrivateKey, error) {
 	switch cardType {
 	case PIVCardTypeYubikey:

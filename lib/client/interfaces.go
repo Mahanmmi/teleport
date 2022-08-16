@@ -97,18 +97,15 @@ type Key struct {
 
 // GenerateKey generates a new unsigned client key.
 func GenerateKey() (*Key, error) {
-	// TODO (Joerger): use PIV if "require_session_mfa: hardware_key"
+	// TODO (Joerger): use PIV key if configured by server
 	if os.Getenv("TSH_PIV") != "" {
-		log.Debugf("Generating a new Client Key (PIV)")
-		// TODO (Joerger): get yubikey serial number from user's configured mfa device
-		var serialNumber string
-		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, serialNumber)
+		// Generate a PIV privatekey on the first Yubikey PIV we find.
+		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, "")
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		return NewKey(priv), nil
 	}
-	log.Debugf("Generating a new Client Key (RSA)")
 	return GenerateRSAKey()
 }
 

@@ -37,7 +37,7 @@ const (
 	pkcs8PrivateKeyType      = "PRIVATE KEY"
 	rsaPrivateKeyType        = "RSA PRIVATE KEY"
 	ecdsaPrivateKeyType      = "EC PRIVATE KEY"
-	pivYubikeyPrivateKeyType = "PIV YUBIKEY PRIVATE KEY"
+	pivYubikeyPrivateKeyType = "YUBIKEY PRIVATE KEY"
 )
 
 // PrivateKey implements crypto.PrivateKey and crypto.Signer, with additional helper methods
