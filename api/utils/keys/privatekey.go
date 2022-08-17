@@ -20,7 +20,6 @@ package keys
 import (
 	"crypto"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/pem"
 	"os"
 
@@ -30,7 +29,8 @@ import (
 )
 
 const (
-	rsaPrivateKeyType = "RSA PRIVATE KEY"
+	rsaPrivateKeyType   = "RSA PRIVATE KEY"
+	ecdsaPrivateKeyType = "EC PRIVATE KEY"
 )
 
 // PrivateKey implements crypto.PrivateKey and crypto.Signer, with additional helper methods
@@ -69,11 +69,9 @@ func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
 
 	switch block.Type {
 	case rsaPrivateKeyType:
-		rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return NewRSAPrivateKey(rsaPrivateKey)
+		return ParseRSAPrivateKey(block.Bytes)
+	case ecdsaPrivateKeyType:
+		return ParseECDSAPrivateKey(block.Bytes)
 	default:
 		return nil, trace.BadParameter("unexpected private key PEM type %q", block.Type)
 	}

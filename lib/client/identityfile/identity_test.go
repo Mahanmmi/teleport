@@ -139,13 +139,12 @@ func TestWrite(t *testing.T) {
 
 	wantArr := [][]byte{
 		key.PrivateKeyPEM(),
-		{'\n'},
 		key.Cert,
 		key.TLSCert,
 		bytes.Join(key.TLSCAs(), []byte{}),
 	}
 	want := string(bytes.Join(wantArr, nil))
-	require.Equal(t, string(out), want)
+	require.Equal(t, want, string(out))
 
 	// Test kubeconfig creation.
 	cfg.OutputPath = filepath.Join(outputDir, "kubeconfig")
