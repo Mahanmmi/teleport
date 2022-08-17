@@ -2949,3 +2949,22 @@ func (c *Client) UpdateConnectionDiagnostic(ctx context.Context, connectionDiagn
 	_, err := c.grpc.UpdateConnectionDiagnostic(ctx, connectionDiagnosticV1, c.callOpts...)
 	return trail.FromGRPC(err)
 }
+
+// AttestHardwarePrivateKey attests a hardware private key so that it
+// will be trusted by the Auth server in subsequent calls.
+func (c *Client) AttestHardwarePrivateKey(ctx context.Context, req *proto.AttestHardwarePrivateKeyRequest) (*proto.AttestHardwarePrivateKeyResponse, error) {
+	resp, err := c.grpc.AttestHardwarePrivateKey(ctx, req, c.callOpts...)
+	if err != nil {
+		return nil, trail.FromGRPC(err)
+	}
+	return resp, nil
+}
+
+// GetPrivateKeyPolicy gets the private key policy enforced for the current user.
+func (c *Client) GetPrivateKeyPolicy(ctx context.Context, req *proto.GetPrivateKeyPolicyRequest) (*proto.GetPrivateKeyPolicyResponse, error) {
+	resp, err := c.grpc.GetPrivateKeyPolicy(ctx, req, c.callOpts...)
+	if err != nil {
+		return nil, trail.FromGRPC(err)
+	}
+	return resp, nil
+}
