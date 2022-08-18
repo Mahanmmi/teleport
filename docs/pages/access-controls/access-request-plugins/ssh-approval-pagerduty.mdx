@@ -77,73 +77,103 @@ Run `./install` from `teleport-pagerduty` or place the executable in the appropr
   $ docker pull quay.io/gravitational/teleport-plugin-pagerduty:(=teleport.plugin.version=)
   ```
 </TabItem>
-</Tabs>
-
-<Details title="Installing via Helm?">
+<TabItem label="Helm Chart">
   ```code
   $ helm repo add teleport https://charts.releases.teleport.dev/
-  $ helm install teleport-plugin-pagerduty teleport/teleport-plugin-pagerduty --values teleport-pagerduty-helm.yaml
   ```
-
-  See an example for `teleport-pagerduty-helm.yaml` under [Running Teleport in Kubernetes?](#running-teleport-in-kubernetes)
-</Details>
+</TabItem>
+</Tabs>
 
 ### Config file
 
-Teleport's PagerDuty plugin has its own configuration file in TOML format. Before starting the plugin for the first time, you'll need to generate and edit that config file.
+Depending on whether you are running the plugin as an executable in a
+non-containerized environment or on Kubernetes, follow the appropriate
+instructions for your environment to configure the plugin:
+
+#### Editing the config file
+
+<Tabs dropdownCaption="Environment type" dropdownSelected="Executable">
+<TabItem
+label="Connect to the Proxy Service"
+options="Executable"
+>
+
+Teleport's PagerDuty Access Request Plugin has its own configuration
+file in TOML format. Before starting the plugin for the first time,
+you'll need to generate and edit that config file.
 
 ```code
 $ teleport-pagerduty configure > teleport-pagerduty.toml
 $ sudo mv teleport-pagerduty.toml /etc
 ```
 
-#### Editing the config file
-
 After generating the config, edit it as follows:
 
-<Tabs>
-<TabItem scopes={["oss", "enterprise"]} label="Self-Hosted">
 ```yaml
 (!examples/resources/plugins/teleport-pagerduty-self.toml!)
 ```
 </TabItem>
-<TabItem scopes={["cloud"]} label="Cloud">
+<TabItem
+label="Connect to the Auth Service"
+options="Executable"
+>
+Teleport's PagerDuty Access Request Plugin has its own configuration
+file in TOML format. Before starting the plugin for the first time,
+you'll need to generate and edit that config file.
+
+```code
+$ teleport-pagerduty configure > teleport-pagerduty.toml
+$ sudo mv teleport-pagerduty.toml /etc
+```
+
+After generating the config, edit it as follows:
+
 ```yaml
 (!examples/resources/plugins/teleport-pagerduty-cloud.toml!)
 ```
 </TabItem>
-</Tabs>
-
-<Details title="Running Teleport in Kubernetes?">
-  <Tabs>
-    <TabItem label="Self-hosted" scope={["oss","enterprise","cloud"]}>
+<TabItem
+label="Connect to the Proxy Service "
+options="Helm Chart"
+>
+Create a file called `values.yaml` with the following content, which configures
+the Helm chart for the plugin. It should resemble the following:
 
 ```yaml
 (!examples/resources/plugins/teleport-pagerduty-helm-self.yaml!)
 ```
 
-  </TabItem>
-  <TabItem label="Cloud" scope={["cloud"]}>
+Use the following command to create the Kubernetes secret referenced in the
+values file from the identity file you generated earlier:
+
+```console
+kubectl create secret generic teleport-plugin-jira-identity --from-file=auth_id=auth.pem
+```
+</TabItem>
+<TabItem
+label="Connect to the Auth Service "
+options="Helm Chart"
+>
+Create a file called `values.yaml` with the following content, which configures
+the Helm chart for the plugin. It should resemble the following:
 
 ```yaml
 (!examples/resources/plugins/teleport-pagerduty-helm-cloud.yaml!)
 ```
 
-    </TabItem>
-  </Tabs>
-
-Use the following command to create a Kubernetes secret from the identity file
-generated in the [export identity](#step-37-export-the-access-plugin-identity) section:
+Use the following command to create the Kubernetes secret referenced in the
+values file from the identity file you generated earlier:
 
 ```console
-kubectl create secret generic teleport-plugin-pagerduty-identity --from-file=auth_id=auth.pem
+kubectl create secret generic teleport-plugin-jira-identity --from-file=auth_id=auth.pem
 ```
-
-For installation instructions, see [Installing via Helm?](#installing-via-helm)
-</Details>
+</TabItem>
+</Tabs>
 
 ### Testing the plugin
 
+<Tabs>
+<TabItem label="Executable">
 With the config above, you should be able to run the plugin invoking
 `teleport-pagerduty start -d`. The will provide some debug information to make sure
 the bot can connect to PagerDuty.
@@ -161,7 +191,17 @@ $ teleport-pagerduty start -d
 # DEBU   Setting up the webhook extensions pagerduty/main.go:178
 ```
 
-By default, `teleport-pagerduty` will assume its config is in `/etc/teleport-pagerduty.toml`, but you can override it with `--config` option.
+By default, `teleport-pagerduty` will assume its config is in
+`/etc/teleport-pagerduty.toml`, but you can override it with `--config` option.
+</TabItem>
+<TabItem label="Helm Chart">
+With the config above, you should be able to run the plugin invoking teleport-pagerduty start -d. The will provide some debug information to make sure the bot can connect to PagerDuty.
+
+```code
+$ helm install teleport-plugin-pagerduty teleport/teleport-plugin-pagerduty --values teleport-pagerduty-helm.yaml
+```
+</TabItem>
+</Tabs>
 
 ### Set up systemd
 
@@ -191,10 +231,10 @@ Save this as `teleport-pagerduty.service`.
 
 ## On-call auto-approval
 
-The PagerDuty plugin has an option to auto-approve Access Requests. This
-feature will map an external SSO identity to a PagerDuty on-call email address.
-If the user requesting matches the person on call the request will be
-automatically approved.
+The PagerDuty Access Request Plugin has an option to auto-approve Access
+Requests. This feature will map an external SSO identity to a PagerDuty
+on-call email address. If the user requesting matches the person on call
+the request will be automatically approved.
 
 This feature can be enabled via the PagerDuty config file using `auto_approve = true`.
 
