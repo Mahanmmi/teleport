@@ -3595,10 +3595,9 @@ func TestListConnectionsDiagnostic(t *testing.T) {
 
 	// Adding traces
 	diag.AppendTrace(&types.ConnectionDiagnosticTrace{
-		ID:        "some id",
-		TraceType: "rbac checks",
-		Status:    "some status",
-		Details:   "some details",
+		Type:    types.ConnectionDiagnosticTrace_RBAC_NODE,
+		Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+		Details: "some details",
 	})
 	diag.SetMessage("after update")
 	require.NoError(t, env.server.Auth().UpdateConnectionDiagnostic(ctx, diag))
@@ -3698,34 +3697,34 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "success",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "rbac node",
-					Status:    "success",
-					Details:   "Resource exists.",
+					Type:    types.ConnectionDiagnosticTrace_RBAC_NODE,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: "Node found.",
 				},
 				{
-					TraceType: "network connectivity",
-					Status:    "success",
-					Details:   "Host is alive and reachable.",
+					Type:    types.ConnectionDiagnosticTrace_CONNECTIVITY,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: "Host is alive and reachable.",
 				},
 				{
-					TraceType: "rbac principal",
-					Status:    "success",
-					Details:   "Successfully authenticated.",
+					Type:    types.ConnectionDiagnosticTrace_RBAC_PRINCIPAL,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: "Successfully authenticated.",
 				},
 				{
-					TraceType: "node ssh server",
-					Status:    "success",
-					Details:   "Established an SSH connection.",
+					Type:    types.ConnectionDiagnosticTrace_NODE_SSH_SERVER,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: "Established an SSH connection.",
 				},
 				{
-					TraceType: "node ssh session",
-					Status:    "success",
-					Details:   "Created an SSH session.",
+					Type:    types.ConnectionDiagnosticTrace_NODE_SSH_SESSION,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: "Created an SSH session.",
 				},
 				{
-					TraceType: "node principal",
-					Status:    "success",
-					Details:   fmt.Sprintf("%q user exists in target node", osUsername),
+					Type:    types.ConnectionDiagnosticTrace_NODE_PRINCIPAL,
+					Status:  types.ConnectionDiagnosticTrace_SUCCESS,
+					Details: fmt.Sprintf("%q user exists in target node", osUsername),
 				},
 			},
 		},
@@ -3739,10 +3738,10 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "rbac node",
-					Status:    "failed",
-					Details:   "Node not found. Ensure the Node exists and your role allows you to access it.",
-					Error:     fmt.Sprintf("key %q is not found", "/nodes/default/notanode"),
+					Type:    types.ConnectionDiagnosticTrace_RBAC_NODE,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: "Node not found. Ensure the Node exists and your role allows you to access it.",
+					Error:   fmt.Sprintf("key %q is not found", "/nodes/default/notanode"),
 				},
 			},
 		},
@@ -3757,10 +3756,10 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "network connectivity",
-					Status:    "failed",
-					Details:   "Failed to access the host. Please ensure it's network reachable.",
-					Error:     "dial tcp 192.0.2.1:22: i/o timeout",
+					Type:    types.ConnectionDiagnosticTrace_CONNECTIVITY,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: "Failed to access the host. Please ensure it's network reachable.",
+					Error:   "dial tcp 192.0.2.1:22: i/o timeout",
 				},
 			},
 		},
@@ -3775,10 +3774,10 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "node ssh server",
-					Status:    "failed",
-					Details:   "Failed to open SSH connection. Please ensure Teleport is running.",
-					Error:     "ssh: handshake failed: EOF",
+					Type:    types.ConnectionDiagnosticTrace_NODE_SSH_SERVER,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: "Failed to open SSH connection. Please ensure Teleport is running.",
+					Error:   "ssh: handshake failed: EOF",
 				},
 			},
 		},
@@ -3792,10 +3791,10 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "rbac node",
-					Status:    "failed",
-					Details:   "Node not found. Ensure the Node exists and your role allows you to access it.",
-					Error:     "not found",
+					Type:    types.ConnectionDiagnosticTrace_RBAC_NODE,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: "Node not found. Ensure the Node exists and your role allows you to access it.",
+					Error:   "not found",
 				},
 			},
 		},
@@ -3809,10 +3808,10 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "rbac principal",
-					Status:    "failed",
-					Details:   "Principal is not allowed by this certificate. Ensure your roles allows you use it.",
-					Error:     `ssh: principal "deniedprincipal" not in the set of valid principals for given certificate: ["` + osUsername + `" "-teleport-internal-join"]`,
+					Type:    types.ConnectionDiagnosticTrace_RBAC_PRINCIPAL,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: "Principal is not allowed by this certificate. Ensure your roles allows you use it.",
+					Error:   `ssh: principal "deniedprincipal" not in the set of valid principals for given certificate: ["` + osUsername + `" "-teleport-internal-join"]`,
 				},
 			},
 		},
@@ -3826,16 +3825,17 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			expectedMessage: "failed",
 			expectedTraces: []types.ConnectionDiagnosticTrace{
 				{
-					TraceType: "node principal",
-					Status:    "failed",
-					Details:   `Failed to query the current user in the target node. Please ensure the principal "nonvalidlinuxuser" is a valid Linux login in the target node. Output from Node: Failed to launch: user: unknown user nonvalidlinuxuser.`,
-					Error:     "Process exited with status 255",
+					Type:    types.ConnectionDiagnosticTrace_NODE_PRINCIPAL,
+					Status:  types.ConnectionDiagnosticTrace_FAILED,
+					Details: `Failed to query the current user in the target node. Please ensure the principal "nonvalidlinuxuser" is a valid Linux login in the target node. Output from Node: Failed to launch: user: unknown user nonvalidlinuxuser.`,
+					Error:   "Process exited with status 255",
 				},
 			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			pack := env.proxies[0].authPack(t, tt.teleportUser, tt.roles)
+
 			createConnectionEndpoint := pack.clt.Endpoint("webapi", "sites", clusterName, "diagnostics", "connections")
 
 			if tt.updateAddr != "" {
@@ -3888,7 +3888,7 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 				ResourceKind: "node",
 				ResourceName: tt.resourceName,
 				SSHPrincipal: tt.nodeUser,
-				// Default is 5 seconds but since tests run locally, we can reduce this value to also improve test responsiveness
+				// Default is 30 seconds but since tests run locally, we can reduce this value to also improve test responsiveness
 				DialTimeout: time.Second,
 			})
 			require.NoError(t, err)
@@ -3898,7 +3898,7 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 			require.NoError(t, json.Unmarshal(resp.Bytes(), &connectionDiagnostic))
 
 			for i, trace := range connectionDiagnostic.Traces {
-				t.Logf("%s : %d id='%s' status='%s' type='%s' details='%s' error='%s'\n", tt.name, i, trace.ID, trace.Status, trace.TraceType, trace.Details, trace.Error)
+				t.Logf("%s : %d status='%s' type='%s' details='%s' error='%s'\n", tt.name, i, trace.Status, trace.TraceType, trace.Details, trace.Error)
 			}
 
 			require.Equal(t, tt.expectedSuccess, connectionDiagnostic.Success)
@@ -3908,13 +3908,12 @@ func TestDiagnoseSSHConnection(t *testing.T) {
 
 				foundTrace := false
 				for _, returnedTrace := range connectionDiagnostic.Traces {
-					if expectedTrace.TraceType != returnedTrace.TraceType {
+					if expectedTrace.Type.String() != returnedTrace.TraceType {
 						continue
 					}
 
 					foundTrace = true
-					require.NotEmpty(t, returnedTrace.ID)
-					require.Equal(t, expectedTrace.Status, returnedTrace.Status)
+					require.Equal(t, expectedTrace.Status.String(), returnedTrace.Status)
 					require.Equal(t, expectedTrace.Details, returnedTrace.Details)
 					require.Equal(t, expectedTrace.Error, returnedTrace.Error)
 				}

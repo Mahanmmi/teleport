@@ -2950,19 +2950,13 @@ func (c *Client) UpdateConnectionDiagnostic(ctx context.Context, connectionDiagn
 	return trail.FromGRPC(err)
 }
 
-// AppendTraceConnectionDiagnostic adds a new trace for the given ConnectionDiagnostic.
-func (c *Client) AppendTraceConnectionDiagnostic(ctx context.Context, name string, t *types.ConnectionDiagnosticTrace) (types.ConnectionDiagnostic, error) {
-	req := &proto.GetConnectionDiagnosticRequest{
-		Name: name,
+// AppendDiagnosticTrace adds a new trace for the given ConnectionDiagnostic.
+func (c *Client) AppendDiagnosticTrace(ctx context.Context, name string, t *types.ConnectionDiagnosticTrace) (types.ConnectionDiagnostic, error) {
+	req := &proto.AppendDiagnosticTraceRequest{
+		Name:  name,
+		Trace: t,
 	}
-	connectionDiagnostic, err := c.grpc.GetConnectionDiagnostic(ctx, req, c.callOpts...)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	connectionDiagnostic.AppendTrace(t)
-
-	_, err = c.grpc.UpdateConnectionDiagnostic(ctx, connectionDiagnostic, c.callOpts...)
+	connectionDiagnostic, err := c.grpc.AppendDiagnosticTrace(ctx, req, c.callOpts...)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
