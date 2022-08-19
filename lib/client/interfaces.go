@@ -94,24 +94,24 @@ type Key struct {
 	TrustedCA []auth.TrustedCerts
 }
 
-// GenerateRSAKey generates a new unsigned key. Such key must be signed by a
-// Teleport CA (auth server) before it becomes useful.
+// GenerateRSAKey generates a new unsigned key.
 func GenerateRSAKey() (*Key, error) {
 	pk, err := native.GeneratePrivateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return NewKey(pk)
+	return NewKey(pk), nil
 }
 
-func NewKey(pk keys.PrivateKey) (*Key, error) {
+// NewKey creates a new Key for the given private key.
+func NewKey(priv keys.PrivateKey) *Key {
 	return &Key{
-		PrivateKey:          pk,
+		PrivateKey:          priv,
 		KubeTLSCerts:        make(map[string][]byte),
 		DBTLSCerts:          make(map[string][]byte),
 		AppTLSCerts:         make(map[string][]byte),
 		WindowsDesktopCerts: make(map[string][]byte),
-	}, nil
+	}
 }
 
 // extractIdentityFromCert parses a tlsca.Identity from raw PEM cert bytes.

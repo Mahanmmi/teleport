@@ -91,7 +91,7 @@ func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
 		case ed25519.PrivateKey:
 			return NewED25519(priv)
 		default:
-			return nil, trace.BadParameter("unknown privte key type in PKCS#8 wrapping")
+			return nil, trace.BadParameter("unknown private key type in PKCS#8 wrapping")
 		}
 	default:
 		return nil, trace.BadParameter("unexpected private key PEM type %q", block.Type)
@@ -166,5 +166,5 @@ type agentKeyComment struct {
 }
 
 func (a *agentKeyComment) String() string {
-	return fmt.Sprintf("teleprot:%s", a.user)
+	return fmt.Sprintf("teleport:%s", a.user)
 }
