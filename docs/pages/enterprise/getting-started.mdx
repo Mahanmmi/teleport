@@ -328,24 +328,6 @@ $ tsh logout
 
 </Details>
 
-## Configuring SSO
-
-The local account is good for administrative purposes but regular users of
-Teleport Enterprise should be using a Single Sign-On (SSO) mechanism that use SAML or OIDC protocols.
-
-Take a look at the [Single Sign-on](sso.mdx) chapter to learn the basics of
-integrating Teleport with SSO providers. We have the following detailed guides for
-configuring SSO providers:
-
-- [Okta](sso/okta.mdx)
-- [Active Directory](sso/adfs.mdx)
-- [One Login](sso/one-login.mdx)
-- [GitHub](../setup/admin/github-sso.mdx)
-
-Any SAML-compliant provider can be configured with Teleport by following the
-same steps.  There are Teleport Enterprise customers who are using Oracle IDM,
-SailPoint and others.
-
 ## Run Teleport Enterprise using Docker
 
 We provide pre-built Docker images for every version of Teleport Enterprise. These images are hosted on quay.io.
@@ -445,6 +427,32 @@ NOTE: Make sure localhost:3080 points at a Teleport proxy which users can access
 ```
 
 You can now [follow this guide from "Adding Users"](#adding-users) onwards to create your user and log into Teleport Enterprise.
+
+## Next steps
+
+### Configure SSO
+
+The local account you created in this guide is well suited for managing yoru
+cluster. For on– and offboarding regular users, you should use one of Teleport's
+Single Sign-On integrations.
+
+Take a look at our [Single Sign-on](sso.mdx) guide to learn the basics of
+integrating Teleport with SSO providers. We have the following detailed guides
+for configuring SSO providers:
+
+- [Active Directory](sso/adfs.mdx)
+- [Azure AD](sso/azuread.mdx)
+- [GitHub](../setup/admin/github-sso.mdx)
+- [GitLab](sso/gitlab.mdx)
+- [Google Workspace](sso/google-workspace.mdx)
+- [OIDC](sso/oidc.mdx)
+- [Okta](sso/okta.mdx)
+- [Okta](sso/okta.mdx)
+- [One Login](sso/one-login.mdx)
+
+You can configure any SAML– or OIDC-compliant identity provider to enable SSO
+for Teleport. There are Teleport Enterprise customers who are using Oracle IDM,
+SailPoint, and others.
 
 ## Troubleshooting
 
