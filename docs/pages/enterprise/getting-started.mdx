@@ -1,37 +1,38 @@
 ---
-title: Teleport Enterprise Quick Start
-description: How to set up and configure Teleport Enterprise for SSH
-h1: Teleport Enterprise Quick Start
+title: Get Started with Teleport Enterprise
+description: Learn how to deploy your first Teleport Enterprise cluster.
 ---
 
 This guide shows you how to get up and running with Teleport Enterprise.
 
-There are three types of services Teleport can run:
+You will be deploying three Teleport services on a single host:
 
-- **Auth Service** stores user accounts and provides authentication and
-  authorization for every resource service and every user in a cluster.
-- **Proxy Service** routes client connection requests to the appropriate agent
-  and serves a Web UI that can also be used to access resources.
-- **Agents** provide access to resources including SSH servers, Kubernetes
-  clusters, web applications and databases.
+- The **Auth Service** stores user accounts and your cluster configuration, and
+  provides authentication and authorization for every Teleport service and every
+  user in your cluster.
+- The **Proxy Service** routes client connection requests to the appropriate
+  Teleport service and serves a Web UI that you can use to access resources or
+  manage the cluster.
+- The **SSH Service**  is an SSH server implementation that provides seamless
+  access to Linux hosts in your cluster. 
 
-In this guide, we will highlight the Teleport SSH Service. The SSH Service is
-similar to the `sshd` daemon you may be familiar with. SSH Service instances are
-called **Teleport Nodes**. When a Teleport Node receives a connection request,
-the request is authenticated through the cluster's Auth Service.
+  SSH Service instances are called **Teleport Nodes**. When a Teleport Node
+  receives a connection request, the request is authenticated through the
+  cluster's Auth Service.
 
-The `teleport` daemon runs all three of these services by default.
+  Other Teleport services provide access to remote desktops, Kubernetes
+  clusters, applications, and databases.
 
-This guide will run a Teleport cluster consisting of the Auth Service, Proxy
-Service, and SSH Service, and interact with the cluster using Teleport's
-client-side tools:
+You will install the `teleport` binary, which runs runs all three of these
+services by default.
+
+You will also use the following client tools:
 
 | Tool | Description |
 | - | - |
-| tctl | Cluster administration tool used to invite Nodes to a cluster and manage user accounts. |
-| tsh | Allows users to authenticate and access resources via their local machine. `tsh`'s SSH functionality is similar in principle to OpenSSH's `ssh`. Users can log in to remote Nodes, list and search for Nodes in a cluster, securely upload/download files, etc. |
-| browser | You can use your web browser to log in to any Teleport Node by opening `https://<proxy-host>:3080`. |
-
+| `tctl` | Cluster administration tool used to invite Nodes to a cluster and manage user accounts. |
+| `tsh` | Allows users to authenticate and access resources via their local machine. `tsh`'s SSH functionality is similar in principle to OpenSSH's `ssh`. Users can log in to remote Nodes, list and search for Nodes in a cluster, securely upload/download files, etc. |
+| Web UI | You can use the Teleport Web UI to log in to any Teleport Node by opening `https://<proxy-host>`. |
 
 ## Prerequisites
 
