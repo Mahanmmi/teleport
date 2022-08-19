@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"io"
@@ -46,6 +47,7 @@ import (
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/api/types/wrappers"
 	apiutils "github.com/gravitational/teleport/api/utils"
+	"github.com/gravitational/teleport/api/utils/keys"
 	apisshutils "github.com/gravitational/teleport/api/utils/sshutils"
 	"github.com/gravitational/teleport/lib/asciitable"
 	"github.com/gravitational/teleport/lib/auth"
@@ -963,6 +965,8 @@ func Run(ctx context.Context, args []string, opts ...cliOption) error {
 			return trace.Wrap(err)
 		}
 		err = onLogout(&cf)
+	case show.FullCommand():
+		err = onShow(&cf)
 	case status.FullCommand():
 		err = onStatus(&cf)
 	case lsApps.FullCommand():
@@ -2921,7 +2925,13 @@ func makeClientForProxy(cf *CLIConf, proxy string, useProfileLogin bool) (*clien
 				}
 			}
 		} else if trace.IsNotImplemented(err) {
-			log.WithError(err).Infof("Failed to add key to agent keys.")
+			// If the key does not support adding agent keys, then log the error
+			// and continue without them. This is necessary because agent.AddedKey
+			// only supports plain RSA, ECDSA, and ED25519 keys. Hardware Private
+			// keys like Yubikey PIV will require custom solutions which may not
+			// be implemented up front. This will only affect Agent forwarding,
+			// so we log this as INFO and continue with a non-agent login session.
+			log.WithError(err).Infof("Failed to add key to agent keys. Some integrations related to agent forwarding will not work with this login session.")
 		} else {
 			return nil, trace.Wrap(err)
 		}
@@ -3229,6 +3239,34 @@ func refuseArgs(command string, args []string) error {
 			return trace.BadParameter("unexpected argument: %s", arg)
 		}
 	}
+	return nil
+}
+
+// onShow reads an identity file (a public SSH key or a cert) and dumps it to stdout
+func onShow(cf *CLIConf) error {
+	key, err := client.KeyFromIdentityFile(cf.IdentityFileIn)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	// unmarshal certificate bytes into a ssh.PublicKey
+	cert, _, _, _, err := ssh.ParseAuthorizedKey(key.Cert)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	var privateKey crypto.PrivateKey
+	switch priv := key.PrivateKey.(type) {
+	case *keys.RSAPrivateKey:
+		privateKey = priv.PrivateKey
+	case *keys.ECDSAPrivateKey:
+		privateKey = priv.PrivateKey
+	default:
+		privateKey = priv
+	}
+
+	fmt.Printf("Cert: %#v\nPriv: %#v\nPub: %#v\n", cert, privateKey, key.SSHPublicKeyPEM())
+	fmt.Printf("Fingerprint: %s\n", ssh.FingerprintSHA256(key.SSHPublicKey()))
 	return nil
 }
 

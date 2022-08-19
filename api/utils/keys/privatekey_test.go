@@ -30,7 +30,7 @@ func TestParsePrivateKey(t *testing.T) {
 		desc        string
 		keyPEM      []byte
 		assertError require.ErrorAssertionFunc
-		expectType  interface{}
+		assertKey   require.ValueAssertionFunc
 	}{
 		{
 			desc:   "invalid PEM",
@@ -38,6 +38,7 @@ func TestParsePrivateKey(t *testing.T) {
 			assertError: func(t require.TestingT, err error, i ...interface{}) {
 				require.True(t, trace.IsBadParameter(err), "expected trace.BadParameter, got %T", err)
 			},
+			assertKey: require.Nil,
 		},
 		{
 			desc: "invalid type",
@@ -47,85 +48,85 @@ func TestParsePrivateKey(t *testing.T) {
 			assertError: func(t require.TestingT, err error, i ...interface{}) {
 				require.True(t, trace.IsBadParameter(err), "expected trace.BadParameter, got %T", err)
 			},
+			assertKey: require.Nil,
 		},
 		{
-			desc:       "rsa key",
-			keyPEM:     rsaPEM,
-			expectType: &RSAPrivateKey{},
+			desc:        "rsa key",
+			keyPEM:      rsaKeyPEM,
+			assertError: require.NoError,
+			assertKey: func(tt require.TestingT, key interface{}, i2 ...interface{}) {
+				require.IsType(t, &RSAPrivateKey{}, key)
+			},
 		},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			priv, err := ParsePrivateKey(tt.keyPEM)
-			if tt.assertError != nil {
-				tt.assertError(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.IsType(t, tt.expectType, priv)
+			tt.assertError(t, err)
+			tt.assertKey(t, priv)
 		})
 	}
 }
 
 // TestX509KeyPair tests that X509KeyPair returns the same value as tls.X509KeyPair
 func TestX509KeyPair(t *testing.T) {
-	expectCert, err := tls.X509KeyPair(rsaCert, rsaPEM)
+	expectCert, err := tls.X509KeyPair(rsaCertPEM, rsaKeyPEM)
 	require.NoError(t, err)
 
-	tlsCert, err := X509KeyPair(rsaCert, rsaPEM)
+	tlsCert, err := X509KeyPair(rsaCertPEM, rsaKeyPEM)
 	require.NoError(t, err)
 
 	require.Equal(t, expectCert, tlsCert)
 }
 
+// generated with `openssl req -x509 -out rsa.crt -keyout rsa.key -newkey rsa:2048 -nodes -sha256`
 var (
-	rsaPEM = []byte(`-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAzkUVoJ4rn2XAi2HJeBIIxlsdMPGzLroJub9eHAVspAueDJLS
-gqQduHTog01R9MAARoWUwbQLN0DIbJFK70UrwETXbuREcGzqFvWlODLZ/pMWQWj+
-HhZNZbgZBKI7wCXsDa25GNzeYCeTvWr6S+lBhLu2eSGYUJgTyMrEy2Vgbf3HiRDp
-u2WXs/3Mjpdm/lFGuXOoAO7BmkRwthWLROMhOo9vHesNlPiX4SayWFqgb7ETlW74
-ZhcuW/AH0T9qZ83Vn0qmzg5vonHGx72SN4yKv2bCI2QFZXKEf8sRMMD1drqxNDZ7
-vkxgzvJcktg6YEpXiDXvpB/VPXJ7tr8aCfi3ZQIDAQABAoIBAE1Vk207wAksAgt/
-5yQwRr/vizs9czuSnnDYsbT5x6idfm0iYvB+DXKJyl7oD1Ee5zuJe6NAGHBnxn0F
-4D1jBqs4ZDj8NjicbQucn4w5bIfIp7BwZ83p+KypYB/fn11EGoNqXZpXvLv6Oqbq
-w9rQIjNcmWZC1TNqQQioFS5Y3NV/gw5uYCRXZlSLMsRCvcX2+LN2EP76ZbkpIVpT
-CidC2TxwFPPbyMsG774Olfz4U2IDgX1mO+milF7RIa/vPADSeHAX6tJHmZ13GsyP
-0GAdPbFa0Ls/uykeGi1uGPFkdkNEqbWlDf1Z9IG0dr/ck2eh8G2X8E+VFgzsKp4k
-WtH9nGECgYEA53lFodLiKQjQR7IoUmGp+P6qnrDwOdU1RfT9jse35xOb9tYvZs3X
-kUXU+MEGAMW1Pvmo1v9xOjZbdFYB9I/tIYTSyjYQNaFjgJMPMLSx2qjMzhFXAY5f
-8t20/CBt2V1q46aa8tR2ll//QvY4mqvJUaaB0pkuasFbKMXJcGKdvdkCgYEA5CAo
-UI8NVA9GqAJfs7hkGHQwpX1X1+JpFhF4dZKsV40NReqaK0vd/mWTYjlMOPO6oolr
-PoCDUlQYU6poIDtEnfJ6KkYuLMgxZKnS2OlDthKoZJe9aUTCP1RhTVHyyABRXbGg
-tNMKFYkZ38C9+JM+X5T0eKZTHeK+wjiZd55+sm0CgYAmyp0PxI6gP9jf2wyE2dcp
-YkxnsdFgb8mwwqDnl7LLJ+8gS76/5Mk2kFRjp72AzaFVP3O7LC3miouDEJLdUG12
-C5NjzfGjezt4payLBg00Tsub0S4alaigw+T7x9eA8PXj1tzqyw5gnw/hQfA0g4uG
-gngJOiCcRXEogRUEH5K96QKBgFUnB8ViUHhTJ22pTS3Zo0tZe5saWYLVGaLKLKu+
-byRTG2RAuQF2VUwTgFtGxgPwPndTUjvHXr2JdHcugaWeWfOXQjCrd6rxozZPCcw7
-7jF1b3P1DBfSOavIBHYHI9ex/q05k6JLsFTvkz/pQ0AZPkwRXtv2QcpDDC+VTvvO
-pr5VAoGBAJBhNjs9wAu+ZoPcMZcjIXT/BAj2tQYiHoRnNpvQjDYbQueUBeI0Ry8d
-5QnKS2k9D278P6BiDBz1c+fS8UErOxY6CS0pi4x3fjMliPwXj/w7AzjlXgDBhRcp
-90Ns/9SamlBo9j8ETm9g9D3EVir9zF5XvoR13OdN9gabGy1GuubT
------END RSA PRIVATE KEY-----`)
-	rsaCert = []byte(`-----BEGIN CERTIFICATE-----
-MIIDyzCCArOgAwIBAgIQD3MiJ2Au8PicJpCNFbvcETANBgkqhkiG9w0BAQsFADBe
-MRQwEgYDVQQKEwtleGFtcGxlLmNvbTEUMBIGA1UEAxMLZXhhbXBsZS5jb20xMDAu
-BgNVBAUTJzIwNTIxNzE3NzMzMTIxNzQ2ODMyNjA5NjAxODEwODc0NTAzMjg1ODAe
-Fw0yMTAyMTcyMDI3MjFaFw0yMTAyMTgwODI4MjFaMIGCMRUwEwYDVQQHEwxhY2Nl
-c3MtYWRtaW4xCTAHBgNVBAkTADEYMBYGA1UEEQwPeyJsb2dpbnMiOm51bGx9MRUw
-EwYDVQQKEwxhY2Nlc3MtYWRtaW4xFTATBgNVBAMTDGFjY2Vzcy1hZG1pbjEWMBQG
-BSvODwEHEwtleGFtcGxlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
-ggEBAM5FFaCeK59lwIthyXgSCMZbHTDxsy66Cbm/XhwFbKQLngyS0oKkHbh06INN
-UfTAAEaFlMG0CzdAyGyRSu9FK8BE127kRHBs6hb1pTgy2f6TFkFo/h4WTWW4GQSi
-O8Al7A2tuRjc3mAnk71q+kvpQYS7tnkhmFCYE8jKxMtlYG39x4kQ6btll7P9zI6X
-Zv5RRrlzqADuwZpEcLYVi0TjITqPbx3rDZT4l+EmslhaoG+xE5Vu+GYXLlvwB9E/
-amfN1Z9Kps4Ob6Jxxse9kjeMir9mwiNkBWVyhH/LETDA9Xa6sTQ2e75MYM7yXJLY
-OmBKV4g176Qf1T1ye7a/Ggn4t2UCAwEAAaNgMF4wDgYDVR0PAQH/BAQDAgWgMB0G
-A1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB8GA1Ud
-IwQYMBaAFJWqMooE05nf263F341pOO+mPMSqMA0GCSqGSIb3DQEBCwUAA4IBAQCK
-s0yPzkSuCY/LFeHJoJeNJ1SR+EKbk4zoAnD0nbbIsd2quyYIiojshlfehhuZE+8P
-bzpUNG2aYKq+8lb0NO+OdZW7kBEDWq7ZwC8OG8oMDrX385fLcicm7GfbGCmZ6286
-m1gfG9yqEte7pxv3yWM+7X2bzEjCBds4feahuKPNxOAOSfLUZiTpmOVlRzrpRIhu
-2XxiuH+E8n4AP8jf/9bGvKd8PyHohtHVf8HWuKLZxWznQhoKkcfmUmlz5q8ci4Bq
-WQdM2NXAMABGAofGrVklPIiraUoHzr0Xxpia4vQwRewYXv8bCPHW+8g8vGBGvoG2
-gtLit9DL5DR5ac/CRGJt
+	rsaKeyPEM = []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA3oJ7CEGLoQ+JdbTY5j//tgZC+kG5dUIAnMecOy4OXGUp2dYv
+KC/ZCZkc0SQDaiTS35STaguJbrEBPvu34kXb0HDFP+GFULso/DqajwncOIq+/Rlp
+M6JJFrPtl26aP4km3HdKApoUG3CzjFdAHSMm04PGWAqdWoHnd/910w0Ve8QoAjdP
+JcpfDnheilXeqz/+zbSmXB0CVTRz6JH8L8R/Enk07pCHh0kfT3LYQDhImtJZUWTr
+ePmamP8XoV9z+naYZ+qeB+KamNfuzm7ZOLQoYpAhpcN+3JPaPijGOmWhe86ASjxx
+TMGSlEeLMCO++2K5gwNzOEw8cpIv8A9hTgswUwIDAQABAoIBAHAybwNMubFu+ism
+E7CWWMRaB+/UsEVWEKT9aePVZ1xjjmTPQVwMNG5IjGVQuYAOLV6btnFke9oa2rv9
+hU1NWHeURYHen7CDjzkP+9tgZ3EDVSaeZ5Onox8Vfxo6pQCgkb3dUK5bLwRfIcoE
+PMn0baF98sd2Ir3+fs7dO3Y+RLTw1STWEQPc38YDjC50vAlqaeVqiuq5Z6tdQI20
+FJvD4IA9vEHGdaQCVnHqYYmLj1ScUqApU8tqSy//diycboPOgbyleI1Tc99Kr1u0
+YrEhEWYpEq+RPeWDB3Pd+gkv2x0pu9YurPbx5BMpTlDDI/SEaHYUf5tPMDGscxj9
+rw9crQECgYEA+ZIw+U4hohRDrU8fny/adhFOJHXwlllGX2gvZZ/3kNMZyZ2qB0vg
+euW3KZQb22HjSV1Hb3fYmntZ8hAm0CYHiSoYIxdwTU2TM4TnTxkzwUuzJYYWeW6R
+sFi3rim1oJ0r0YzM7PnT2jxY2VrVwXejEQSqBy7i6ZOoik/lXR9xK8ECgYEA5D3U
+7XKIl4XG60EvcUbyi9n5ZjPLMluMkHVBfdHYhIyzAMk/r7NgIfx/RvWC0Rev9oZf
+68zWZPISe8Hhvk50AWmNFz9e4RTN6A+CETcRsnivlQpHorLunmqVEh9EjaLeyjH5
+Ypjv9XEhNSvq9yZB+30eLVX5cte/6rc6XJSFMRMCgYA/qO+/GBPyMPMWaSFqzJ0Q
+Etf46vCkmT8fJQc6B/TxRzfDuujdFZi8II55F6OHcU+1rgqDv3FL7n0CBuavn5O6
+hDdF9DucLFaJBLSv84DFJJcc0jg3X2HgNrEbxt3ii1TbDexT4mIMv+n1/3qY7/hz
+ZdotHOOaqySJq1mZSGTowQKBgQCGGG3JM8lcfJRqE1o0S2KlF+OXUEbJx0/Gb52S
+tn9nIOLqS1LHf7OzRA3jOsso3ancRQaGG0q69B4356khjiZJziG+ztSHmRmAhdv9
+EUWsfYtrHScJR+c525TJmOVF8bLDSKkkbIZOxbCk9LCPlEKf5tqb+C8ecfOniw8W
+5Yt7UQKBgQC5Ddp8WsjeMQw1lVot5dmov+XI3xGjU1VOHaPLROfEcGcT/hECi7m2
+RqAkszaiBY9zOeBabziETI0Yz2HJ8yb9EOvEU5XDLQZxUlyLzLX/iPB0CMhGZamS
+uqFtQXxHcN6SKMemOGegGcmvDezbq1VuIQwlC7dInHjdrMUA6R/9GA==
+-----END RSA PRIVATE KEY-----
+`)
+	rsaCertPEM = []byte(`-----BEGIN CERTIFICATE-----
+MIIDazCCAlOgAwIBAgIUAJcFwTvUhqVPtOQz9LoZMFjdHNAwDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yMjA4MTkyMDAwMTlaFw0yMjA5
+MTgyMDAwMTlaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw
+HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQCwOAugKWySntuMVe4i9r7be1YVedMFV+TJYBm+bE79
+CoQWT6/yipBngpcqBCSalcvemFj1GN2MmBZPO83ixEnj2H5PUqAyVYc/JLks+rvD
+IF9vDwkPTUxV1RJ7pBZrPQwILTAFCsMmtUyamozTxKsaDbUpS7SJLsBJJuQ2eqNE
+F9+4B7A9R9KI4MqpNJC4Aq8H7xogp4w11+IB97RtUeV+Oy4Xf31oW7Dg3vAHJwYC
+SbrxQIYBwviTZiimSLOyXKUnQ7VDA03eKRxiaQSmPDYRaGGgTaFBGLNcGl+dCbbs
+Y51/98CxQfGDP3viYen2VRbLLLyEoWRGxdrzP69Qm4OnAgMBAAGjUzBRMB0GA1Ud
+DgQWBBQZNFypAQe0TMQuGb1wM7OZ9Isq/TAfBgNVHSMEGDAWgBQZNFypAQe0TMQu
+Gb1wM7OZ9Isq/TAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB/
+8lAIuDPGYG9C1soX31X796/6hDXHlw4g3x7aR1B/labMA4VOX0DPZHcff+jvcf/6
+KRrSRz434bv2TnNRV5uZnemGQG62D2d8MOvLUIYdhBb/+4WQD1fvoAVXd9CVmUsS
+/1WxidR2yECtjVNnmun/8FkGvO3IwANVddTw/6GdhFPEKweaY0ovcfhMA9ViNTRV
+ePteZZ+zzLgM96jv128miEKaQFO3GVCMFjMiHpBfkRV/cS8UqEC3x6wqRCZDqgJ3
+aUtIricT34Q7tUlIUM4hn3e9FMfqP03a+W8JItkCrUe1Db7BvAgA+9bHK+o18r1D
+mv1iYi4eRlpXnOD6LJIG
 -----END CERTIFICATE-----`)
 )

@@ -45,15 +45,8 @@ func ParseRSAPrivateKey(keyDER []byte) (*RSAPrivateKey, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	sshPub, err := ssh.NewPublicKey(rsaPrivateKey.Public())
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return &RSAPrivateKey{
-		PrivateKey:    rsaPrivateKey,
-		privateKeyDER: keyDER,
-		sshPub:        sshPub,
-	}, nil
+	key, err := NewRSAPrivateKey(rsaPrivateKey)
+	return key, trace.Wrap(err)
 }
 
 // NewRSAPrivateKey creates a new RSAPrivateKey from a rsa.PrivateKey.
@@ -96,12 +89,9 @@ func (r *RSAPrivateKey) SSHPublicKey() ssh.PublicKey {
 
 // TLSCertificate parses the given TLS certificate paired with the private key
 // to rerturn a tls.Certificate, ready to be used in a TLS handshake.
-func (r *RSAPrivateKey) TLSCertificate(certRaw []byte) (cert tls.Certificate, err error) {
-	cert, err = tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
-	if err != nil {
-		return cert, trace.Wrap(err)
-	}
-	return cert, nil
+func (r *RSAPrivateKey) TLSCertificate(certRaw []byte) (tls.Certificate, error) {
+	cert, err := tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
+	return cert, trace.Wrap(err)
 }
 
 // AsAgentKeys converts Key struct to a []*agent.AddedKey. All elements

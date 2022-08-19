@@ -79,12 +79,12 @@ func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
 
 // LoadPrivateKey returns the PrivateKey for the given key file.
 func LoadPrivateKey(keyFile string) (PrivateKey, error) {
-	peyPEM, err := os.ReadFile(keyFile)
+	keyPEM, err := os.ReadFile(keyFile)
 	if err != nil {
-		return nil, trace.Wrap(err)
+		return nil, trace.ConvertSystemError(err)
 	}
 
-	priv, err := ParsePrivateKey(peyPEM)
+	priv, err := ParsePrivateKey(keyPEM)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -96,12 +96,12 @@ func LoadPrivateKey(keyFile string) (PrivateKey, error) {
 func LoadX509KeyPair(certFile, keyFile string) (tls.Certificate, error) {
 	keyPEMBlock, err := os.ReadFile(keyFile)
 	if err != nil {
-		return tls.Certificate{}, trace.Wrap(err)
+		return tls.Certificate{}, trace.ConvertSystemError(err)
 	}
 
 	certPEMBlock, err := os.ReadFile(certFile)
 	if err != nil {
-		return tls.Certificate{}, trace.Wrap(err)
+		return tls.Certificate{}, trace.ConvertSystemError(err)
 	}
 
 	tlsCert, err := X509KeyPair(certPEMBlock, keyPEMBlock)

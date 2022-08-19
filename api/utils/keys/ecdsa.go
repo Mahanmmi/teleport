@@ -32,7 +32,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// ECDSAPrivateKey is an rsa.PrivateKey with additional methods
+// ECDSAPrivateKey is an ecdsa.PrivateKey with additional methods
 type ECDSAPrivateKey struct {
 	*ecdsa.PrivateKey
 	privateKeyDER []byte
@@ -45,18 +45,11 @@ func ParseECDSAPrivateKey(keyDER []byte) (*ECDSAPrivateKey, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	sshPub, err := ssh.NewPublicKey(ecdsaPrivateKey.Public())
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return &ECDSAPrivateKey{
-		PrivateKey:    ecdsaPrivateKey,
-		privateKeyDER: keyDER,
-		sshPub:        sshPub,
-	}, nil
+	key, err := NewECDSAPrivateKey(ecdsaPrivateKey)
+	return key, trace.Wrap(err)
 }
 
-// NewECDSAPrivateKey creates a new ECDSAPrivateKey from a rsa.PrivateKey.
+// NewECDSAPrivateKey creates a new ECDSAPrivateKey from a ecdsa.PrivateKey.
 func NewECDSAPrivateKey(priv *ecdsa.PrivateKey) (*ECDSAPrivateKey, error) {
 	keyDER, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
@@ -84,7 +77,7 @@ func (r *ECDSAPrivateKey) Equal(x crypto.PrivateKey) bool {
 	return false
 }
 
-// PrivateKeyPEM returns the PEM encoded RSA private key.
+// PrivateKeyPEM returns the PEM encoded ECDSA private key.
 func (r *ECDSAPrivateKey) PrivateKeyPEM() []byte {
 	return pem.EncodeToMemory(&pem.Block{
 		Type:    ecdsaPrivateKeyType,
@@ -100,12 +93,9 @@ func (r *ECDSAPrivateKey) SSHPublicKey() ssh.PublicKey {
 
 // TLSCertificate parses the given TLS certificate paired with the private key
 // to rerturn a tls.Certificate, ready to be used in a TLS handshake.
-func (r *ECDSAPrivateKey) TLSCertificate(certRaw []byte) (cert tls.Certificate, err error) {
-	cert, err = tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
-	if err != nil {
-		return cert, trace.Wrap(err)
-	}
-	return cert, nil
+func (r *ECDSAPrivateKey) TLSCertificate(certRaw []byte) (tls.Certificate, error) {
+	cert, err := tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
+	return cert, trace.Wrap(err)
 }
 
 // AsAgentKeys converts Key struct to a []*agent.AddedKey. All elements
