@@ -1941,9 +1941,7 @@ func (a *Server) ExtendWebSession(ctx context.Context, req WebSessionReq, identi
 	// Keep preserving the login time.
 	sess.SetLoginTime(prevSession.GetLoginTime())
 
-	if req.AccessRequestID != "" {
-		sess.SetAssumedRoleRequestID(req.AccessRequestID)
-	}
+	sess.SetAssumedRoleRequestID(req.AccessRequestID)
 
 	if err := a.upsertWebSession(ctx, req.User, sess); err != nil {
 		return nil, trace.Wrap(err)
