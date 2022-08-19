@@ -28,10 +28,10 @@ const (
 // GeneratePIVPrivateKey generates a new PrivateKey on the given slot of
 // the card identified by cardType and uniqueCardID. If a cardID isn't
 // specified, then the first PIV key found for the given cardType will be used.
-func GeneratePIVPrivateKey(cardType, uniqueCardID string) (PrivateKey, error) {
+func GeneratePIVPrivateKey(cardType, uniqueCardID string, touchRequired bool) (PrivateKey, error) {
 	switch cardType {
 	case PIVCardTypeYubikey:
-		return GenerateYubikeyPrivateKey(uniqueCardID)
+		return GenerateYubikeyPrivateKey(uniqueCardID, touchRequired)
 	default:
 		return nil, trace.BadParameter("PIV device %q not supported", cardType)
 	}

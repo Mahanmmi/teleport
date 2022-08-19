@@ -734,7 +734,13 @@ func RetryWithRelogin(ctx context.Context, tc *TeleportClient, fn func() error) 
 	}
 	log.Debugf("Activating relogin on %v.", err)
 
-	key, err := tc.Login(ctx)
+	// generate a new private key. the public key will be signed via proxy if client's password+OTP are valid
+	key, err := GenerateRSAKey()
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	key, err = tc.Login(ctx, key)
 	if err != nil {
 		if trace.IsTrustError(err) {
 			return trace.Wrap(err, "refusing to connect to untrusted proxy %v without --insecure flag\n", tc.SSHProxyAddr)
@@ -3228,7 +3234,7 @@ func (tc *TeleportClient) GetWebConfig(ctx context.Context) (*webclient.WebConfi
 //
 // The returned Key should typically be passed to ActivateKey in order to
 // update local agent state.
-func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
+func (tc *TeleportClient) Login(ctx context.Context, key *Key) (*Key, error) {
 	ctx, span := tc.Tracer.Start(
 		ctx,
 		"teleportClient/Login",
@@ -3239,12 +3245,6 @@ func (tc *TeleportClient) Login(ctx context.Context) (*Key, error) {
 	// Ping the endpoint to see if it's up and find the type of authentication
 	// supported, also show the message of the day if available.
 	pr, err := tc.PingAndShowMOTD(ctx)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	// generate a new private key. the public key will be signed via proxy if client's password+OTP are valid
-	key, err := GenerateKey()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}

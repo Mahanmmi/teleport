@@ -4941,7 +4941,7 @@ func (a *ServerWithRoles) AttestHardwarePrivateKey(ctx context.Context, req *pro
 		return trace.BadParameter("unknown attestation request type %T", req)
 	}
 
-	requiredPolicy, err := a.getPrivateKeyPolicy(ctx)
+	requiredPolicy, err := a.GetPrivateKeyPolicy(ctx)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -4958,7 +4958,7 @@ func (a *ServerWithRoles) AttestHardwarePrivateKey(ctx context.Context, req *pro
 }
 
 // getPrivateKeyPolicy gets the private key policy enforced for the current user.
-func (a *ServerWithRoles) getPrivateKeyPolicy(ctx context.Context) (constants.PrivateKeyPolicy, error) {
+func (a *ServerWithRoles) GetPrivateKeyPolicy(ctx context.Context) (constants.PrivateKeyPolicy, error) {
 	if !hasLocalUserRole(a.context) && !hasRemoteUserRole(a.context) {
 		return "", trace.AccessDenied("only a user role can call GetPrivateKeyPolicy, got %T", a.context.Checker)
 	}
@@ -4968,7 +4968,7 @@ func (a *ServerWithRoles) getPrivateKeyPolicy(ctx context.Context) (constants.Pr
 		return "", trace.Wrap(err)
 	}
 
-	return services.GetPrivateKeyPolicy(authPref, a.context.Checker), nil
+	return a.context.Checker.PrivateKeyPolicy(authPref.GetPrivateKeyPolicy()), nil
 }
 
 // StartAccountRecovery is implemented by AuthService.StartAccountRecovery.

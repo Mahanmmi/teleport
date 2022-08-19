@@ -34,11 +34,11 @@ func TestYubikeyPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate a new YubikeyPrivateKey
-	priv1, err := y.generatePrivateKey()
+	priv1, err := y.generatePrivateKey(false)
 	require.NoError(t, err)
 
 	// Generate another YubikeyPrivateKey and confirm the key changed
-	priv2, err := y.generatePrivateKey()
+	priv2, err := y.generatePrivateKey(false)
 	require.NoError(t, err)
 	require.False(t, priv2.Equal(priv1))
 

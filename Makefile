@@ -910,6 +910,7 @@ buildbox-grpc:
 		api/client/proto/certs.proto \
 		api/client/proto/joinservice.proto \
 		api/client/proto/proxyservice.proto \
+		api/client/proto/hardwarekeyservice.proto \
 		api/types/events/events.proto \
 		api/types/types.proto \
 		api/types/webauthn/webauthn.proto \
@@ -919,7 +920,7 @@ buildbox-grpc:
 
 	cd api/client/proto && protoc -I=.:$$PROTO_INCLUDE \
 		--gogofast_out=plugins=grpc,$(GOGOPROTO_IMPORTMAP):. \
-		authservice.proto certs.proto joinservice.proto proxyservice.proto
+		authservice.proto certs.proto joinservice.proto proxyservice.proto hardwarekeyservice.proto
 
 	cd api/types/events && protoc -I=.:$$PROTO_INCLUDE \
 		--gogofast_out=plugins=grpc,$(GOGOPROTO_IMPORTMAP):. \

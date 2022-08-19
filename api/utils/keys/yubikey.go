@@ -29,20 +29,18 @@ import (
 )
 
 var (
-	defaultSlot        = piv.SlotAuthentication
-	defaultPINPolicy   = piv.PINPolicyNever
-	defaultTouchPolicy = piv.TouchPolicyNever
+	defaultSlot = piv.SlotAuthentication
 )
 
 // GenerateYubikeyPrivateKey connects to the yubikey with the given serial number
 // and generates a new private key on the given PIV slot with the given policies.
-func GenerateYubikeyPrivateKey(serialNumber string) (*YubikeyPrivateKey, error) {
+func GenerateYubikeyPrivateKey(serialNumber string, touchRequired bool) (*YubikeyPrivateKey, error) {
 	y, err := findYubikey(serialNumber)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return y.generatePrivateKey()
+	return y.generatePrivateKey(touchRequired)
 }
 
 // YubikeyPrivateKey is a Yubikey PIV private key. Cryptographical operations open
@@ -158,6 +156,26 @@ func (y *YubikeyPrivateKey) AsAgentKeys(cert *ssh.Certificate) []agent.AddedKey 
 	return []agent.AddedKey{}
 }
 
+func (y *YubikeyPrivateKey) GetAttestationCerts() (slot, attestation []byte, err error) {
+	yk, err := y.open()
+	if err != nil {
+		return nil, nil, trace.Wrap(err)
+	}
+	defer yk.Close()
+
+	slotCert, err := yk.Attest(defaultSlot)
+	if err != nil {
+		return nil, nil, trace.Wrap(err)
+	}
+
+	attestationCert, err := yk.AttestationCertificate()
+	if err != nil {
+		return nil, nil, trace.Wrap(err)
+	}
+
+	return slotCert.Raw, attestationCert.Raw, nil
+}
+
 // yubikey is a specific yubikey PIV card.
 type yubikey struct {
 	// card is a reader name used to find and connect to this yubikey.
@@ -186,20 +204,25 @@ func newYubikey(card string) (*yubikey, error) {
 }
 
 // generatePrivateKey generates a new private key from the given PIV slot with the given PIV policies.
-func (y *yubikey) generatePrivateKey() (*YubikeyPrivateKey, error) {
+func (y *yubikey) generatePrivateKey(touchRequired bool) (*YubikeyPrivateKey, error) {
 	yk, err := y.open()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	defer yk.Close()
 
+	touchPolicy := piv.TouchPolicyNever
+	if touchRequired {
+		touchPolicy = piv.TouchPolicyCached
+	}
+
 	pub, err := yk.GenerateKey(
 		piv.DefaultManagementKey,
 		defaultSlot,
 		piv.Key{
 			Algorithm:   piv.AlgorithmEC256,
-			PINPolicy:   defaultPINPolicy,
-			TouchPolicy: defaultTouchPolicy,
+			PINPolicy:   piv.PINPolicyNever,
+			TouchPolicy: touchPolicy,
 		},
 	)
 	if err != nil {

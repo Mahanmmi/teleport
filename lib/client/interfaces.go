@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/gravitational/teleport"
@@ -93,20 +92,6 @@ type Key struct {
 	WindowsDesktopCerts map[string][]byte `json:"WindowsDesktopCerts,omitempty"`
 	// TrustedCA is a list of trusted certificate authorities
 	TrustedCA []auth.TrustedCerts
-}
-
-// GenerateKey generates a new unsigned client key.
-func GenerateKey() (*Key, error) {
-	// TODO (Joerger): use PIV key if configured by server
-	if os.Getenv("TSH_PIV") != "" {
-		// Generate a PIV privatekey on the first Yubikey PIV we find.
-		priv, err := keys.GeneratePIVPrivateKey(keys.PIVCardTypeYubikey, "")
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return NewKey(priv), nil
-	}
-	return GenerateRSAKey()
 }
 
 // GenerateRSAKey generates a new unsigned rsa client key.

@@ -455,7 +455,7 @@ func resourceLabel(event types.Event) string {
 }
 
 func (g *GRPCServer) GenerateUserCerts(ctx context.Context, req *proto.UserCertsRequest) (*proto.Certs, error) {
-	auth, err := g.authenticate(ctx)
+	auth, err := g.authenticateWithoutPrivateKeyCheck(ctx)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -4272,7 +4272,7 @@ func (g *GRPCServer) UpdateConnectionDiagnostic(ctx context.Context, connectionD
 // AttestHardwarePrivateKey attests a hardware private key so that it
 // will be trusted by the Auth server in subsequent requests.
 func (g *GRPCServer) AttestHardwarePrivateKey(ctx context.Context, req *proto.AttestHardwarePrivateKeyRequest) (*proto.AttestHardwarePrivateKeyResponse, error) {
-	auth, err := g.authenticate(ctx)
+	auth, err := g.authenticateWithoutPrivateKeyCheck(ctx)
 	if err != nil {
 		return nil, trail.ToGRPC(err)
 	}
@@ -4286,12 +4286,12 @@ func (g *GRPCServer) AttestHardwarePrivateKey(ctx context.Context, req *proto.At
 
 // GetPrivateKeyPolicy gets the private key requirement enforced for the current user.
 func (g *GRPCServer) GetPrivateKeyPolicy(ctx context.Context, req *proto.GetPrivateKeyPolicyRequest) (*proto.GetPrivateKeyPolicyResponse, error) {
-	auth, err := g.authenticate(ctx)
+	auth, err := g.authenticateWithoutPrivateKeyCheck(ctx)
 	if err != nil {
 		return nil, trail.ToGRPC(err)
 	}
 
-	policy, err := auth.ServerWithRoles.getPrivateKeyPolicy(ctx)
+	policy, err := auth.ServerWithRoles.GetPrivateKeyPolicy(ctx)
 	if err != nil {
 		return nil, trail.ToGRPC(err)
 	}
@@ -4377,6 +4377,7 @@ func NewGRPCServer(cfg GRPCServerConfig) (*GRPCServer, error) {
 		server: server,
 	}
 	proto.RegisterAuthServiceServer(server, authServer)
+	proto.RegisterHardwareKeyServiceServer(server, authServer)
 	collectortracepb.RegisterTraceServiceServer(server, authServer)
 
 	// create server with no-op role to pass to JoinService server
@@ -4424,6 +4425,36 @@ type grpcContext struct {
 func (g *GRPCServer) authenticate(ctx context.Context) (*grpcContext, error) {
 	// HTTPS server expects auth context to be set by the auth middleware
 	authContext, err := g.Authorizer.Authorize(ctx)
+	if err != nil {
+		// propagate connection problem error so we can differentiate
+		// between connection failed and access denied
+		if trace.IsConnectionProblem(err) {
+			return nil, trace.ConnectionProblem(err, "[10] failed to connect to the database")
+		} else if trace.IsNotFound(err) {
+			// user not found, wrap error with access denied
+			return nil, trace.Wrap(err, "[10] access denied")
+		} else if trace.IsAccessDenied(err) {
+			// don't print stack trace, just log the warning
+			log.Warn(err)
+		} else {
+			log.Warn(trace.DebugReport(err))
+		}
+		return nil, trace.AccessDenied("[10] access denied")
+	}
+	return &grpcContext{
+		Context: authContext,
+		ServerWithRoles: &ServerWithRoles{
+			authServer: g.AuthServer,
+			context:    *authContext,
+			alog:       g.AuthServer,
+		},
+	}, nil
+}
+
+// authenticateWithoutPrivateKeyCheck extracts authentication context and returns initialized auth server
+func (g *GRPCServer) authenticateWithoutPrivateKeyCheck(ctx context.Context) (*grpcContext, error) {
+	// HTTPS server expects auth context to be set by the auth middleware
+	authContext, err := g.Authorizer.AuthorizeWithoutPrivateKeyCheck(ctx)
 	if err != nil {
 		// propagate connection problem error so we can differentiate
 		// between connection failed and access denied

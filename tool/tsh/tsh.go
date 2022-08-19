@@ -1421,7 +1421,13 @@ func onLogin(cf *CLIConf) error {
 	// Only allow the option during the login ceremony.
 	tc.AllowStdinHijack = true
 
-	key, err := tc.Login(cf.Context)
+	// generate a new rsa private key. the public key will be signed via proxy if client's password+OTP are valid
+	key, err := client.GenerateRSAKey()
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	key, err = tc.Login(cf.Context, key)
 	if err != nil {
 		if !cf.ExplicitUsername && auth.IsInvalidLocalCredentialError(err) {
 			fmt.Fprintf(os.Stderr, "\nhint: set the --user flag to log in as a specific user, or leave it empty to use the system user (%v)\n\n", tc.Username)
@@ -1429,6 +1435,57 @@ func onLogin(cf *CLIConf) error {
 		return trace.Wrap(err)
 	}
 	tc.AllowStdinHijack = false
+
+	if err := setupNoninteractiveClient(tc, key); err != nil {
+		return trace.Wrap(err)
+	}
+	proxy, err := tc.ConnectToProxy(cf.Context)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	site, err := proxy.ConnectToRootCluster(cf.Context)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	requiredPolicy, err := site.GetPrivateKeyPolicy(cf.Context)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	if requiredPolicy != constants.PrivateKeyPolicyNone {
+		fmt.Fprint(os.Stderr, "\nHardware key login is required, please re-enter your login credentials\n")
+		priv, err := keys.GenerateYubikeyPrivateKey("", requiredPolicy == constants.PrivateKeyPolicyHardwareKeyTouch)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+
+		slotCert, attestationCert, err := priv.GetAttestationCerts()
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		err = site.AttestHardwarePrivateKey(cf.Context, &proto.AttestHardwarePrivateKeyRequest{
+			AttestationRequest: &proto.AttestHardwarePrivateKeyRequest_YubikeyAttestationRequest{
+				YubikeyAttestationRequest: &proto.YubikeyAttestationRequest{
+					SlotCert:        slotCert,
+					AttestationCert: attestationCert,
+				},
+			},
+		})
+		if err != nil {
+			return trace.Wrap(err)
+		}
+
+		newKey := client.NewKey(priv)
+		key, err = tc.Login(cf.Context, newKey)
+		if err != nil {
+			if !cf.ExplicitUsername && auth.IsInvalidLocalCredentialError(err) {
+				fmt.Fprintf(os.Stderr, "\nhint: set the --user flag to log in as a specific user, or leave it empty to use the system user (%v)\n\n", tc.Username)
+			}
+			return trace.Wrap(err)
+		}
+		if err := setupNoninteractiveClient(tc, key); err != nil {
+			return trace.Wrap(err)
+		}
+	}
 
 	// the login operation may update the username and should be considered the more
 	// "authoritative" source.
