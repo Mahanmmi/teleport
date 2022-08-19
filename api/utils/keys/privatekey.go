@@ -19,7 +19,11 @@ package keys
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -30,6 +34,7 @@ import (
 )
 
 const (
+	pkcs8PrivateKeyType = "PRIVATE KEY"
 	rsaPrivateKeyType   = "RSA PRIVATE KEY"
 	ecdsaPrivateKeyType = "EC PRIVATE KEY"
 )
@@ -73,6 +78,21 @@ func ParsePrivateKey(keyPEM []byte) (PrivateKey, error) {
 		return ParseRSAPrivateKey(block.Bytes)
 	case ecdsaPrivateKeyType:
 		return ParseECDSAPrivateKey(block.Bytes)
+	case pkcs8PrivateKeyType:
+		priv, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		switch priv := priv.(type) {
+		case *rsa.PrivateKey:
+			return NewRSAPrivateKey(priv)
+		case *ecdsa.PrivateKey:
+			return NewECDSAPrivateKey(priv)
+		case ed25519.PrivateKey:
+			return NewED25519(priv)
+		default:
+			return nil, trace.BadParameter("unknown privte key type in PKCS#8 wrapping")
+		}
 	default:
 		return nil, trace.BadParameter("unexpected private key PEM type %q", block.Type)
 	}

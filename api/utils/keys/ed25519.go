@@ -18,7 +18,7 @@ package keys
 
 import (
 	"crypto"
-	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -31,26 +31,16 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// ECDSAPrivateKey is an ecdsa.PrivateKey with additional methods.
-type ECDSAPrivateKey struct {
-	*ecdsa.PrivateKey
+// ED25519PrivateKey is an ed25519.PrivateKey with additional methods.
+type ED25519PrivateKey struct {
+	ed25519.PrivateKey
 	privateKeyDER []byte
 	sshPub        ssh.PublicKey
 }
 
-// ParseECDSAPrivateKey parses an ECDSAPRivateKey key in SEC 1, ASN.1 DER form.
-func ParseECDSAPrivateKey(keyDER []byte) (*ECDSAPrivateKey, error) {
-	ecdsaPrivateKey, err := x509.ParseECPrivateKey(keyDER)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	key, err := NewECDSAPrivateKey(ecdsaPrivateKey)
-	return key, trace.Wrap(err)
-}
-
-// NewECDSAPrivateKey creates a new ECDSAPrivateKey from a ecdsa.PrivateKey.
-func NewECDSAPrivateKey(priv *ecdsa.PrivateKey) (*ECDSAPrivateKey, error) {
-	keyDER, err := x509.MarshalECPrivateKey(priv)
+// NewED25519 creates a new ED25519 from a ed25519.PrivateKey.
+func NewED25519(priv ed25519.PrivateKey) (*ED25519PrivateKey, error) {
+	keyDER, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -58,7 +48,7 @@ func NewECDSAPrivateKey(priv *ecdsa.PrivateKey) (*ECDSAPrivateKey, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return &ECDSAPrivateKey{
+	return &ED25519PrivateKey{
 		PrivateKey:    priv,
 		privateKeyDER: keyDER,
 		sshPub:        sshPub,
@@ -66,40 +56,40 @@ func NewECDSAPrivateKey(priv *ecdsa.PrivateKey) (*ECDSAPrivateKey, error) {
 }
 
 // Equal returns whether the given private key is equal to this key.
-func (r *ECDSAPrivateKey) Equal(x crypto.PrivateKey) bool {
+func (r *ED25519PrivateKey) Equal(x crypto.PrivateKey) bool {
 	switch priv := x.(type) {
-	case *ECDSAPrivateKey:
+	case *ED25519PrivateKey:
 		return r.PrivateKey.Equal(priv.PrivateKey)
-	case *ecdsa.PrivateKey:
+	case *ed25519.PrivateKey:
 		return r.PrivateKey.Equal(priv)
 	}
 	return false
 }
 
-// PrivateKeyPEM returns the PEM encoded ECDSA private key.
-func (r *ECDSAPrivateKey) PrivateKeyPEM() []byte {
+// PrivateKeyPEM returns the PEM encoded ed25519 private key.
+func (r *ED25519PrivateKey) PrivateKeyPEM() []byte {
 	return pem.EncodeToMemory(&pem.Block{
-		Type:    ecdsaPrivateKeyType,
+		Type:    pkcs8PrivateKeyType,
 		Headers: nil,
 		Bytes:   r.privateKeyDER,
 	})
 }
 
 // SSHPublicKey returns the ssh.PublicKey representiation of the public key.
-func (r *ECDSAPrivateKey) SSHPublicKey() ssh.PublicKey {
+func (r *ED25519PrivateKey) SSHPublicKey() ssh.PublicKey {
 	return r.sshPub
 }
 
 // TLSCertificate parses the given TLS certificate paired with the private key
 // to rerturn a tls.Certificate, ready to be used in a TLS handshake.
-func (r *ECDSAPrivateKey) TLSCertificate(certRaw []byte) (tls.Certificate, error) {
+func (r *ED25519PrivateKey) TLSCertificate(certRaw []byte) (tls.Certificate, error) {
 	cert, err := tls.X509KeyPair(certRaw, r.PrivateKeyPEM())
 	return cert, trace.Wrap(err)
 }
 
 // AsAgentKeys converts Key struct to a []*agent.AddedKey. All elements
 // of the []*agent.AddedKey slice need to be loaded into the agent!
-func (r *ECDSAPrivateKey) AsAgentKeys(sshCert *ssh.Certificate) []agent.AddedKey {
+func (r *ED25519PrivateKey) AsAgentKeys(sshCert *ssh.Certificate) []agent.AddedKey {
 	// put a teleport identifier along with the teleport user into the comment field
 	comment := agentKeyComment{user: sshCert.KeyId}
 

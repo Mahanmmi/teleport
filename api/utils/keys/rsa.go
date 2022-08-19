@@ -31,7 +31,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// RSAPrivateKey is an rsa.PrivateKey with additional methods
+// RSAPrivateKey is an rsa.PrivateKey with additional methods.
 type RSAPrivateKey struct {
 	*rsa.PrivateKey
 	privateKeyDER []byte
