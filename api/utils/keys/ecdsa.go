@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"runtime"
 
 	"github.com/gravitational/teleport/api/constants"
@@ -102,14 +101,14 @@ func (r *ECDSAPrivateKey) TLSCertificate(certRaw []byte) (tls.Certificate, error
 // of the []*agent.AddedKey slice need to be loaded into the agent!
 func (r *ECDSAPrivateKey) AsAgentKeys(sshCert *ssh.Certificate) []agent.AddedKey {
 	// put a teleport identifier along with the teleport user into the comment field
-	comment := fmt.Sprintf("teleport:%v", sshCert.KeyId)
+	comment := agentKeyComment{user: sshCert.KeyId}
 
 	// On all OS'es, return the certificate with the private key embedded.
 	agents := []agent.AddedKey{
 		{
 			PrivateKey:       r.PrivateKey,
 			Certificate:      sshCert,
-			Comment:          comment,
+			Comment:          comment.String(),
 			LifetimeSecs:     0,
 			ConfirmBeforeUse: false,
 		},
@@ -131,7 +130,7 @@ func (r *ECDSAPrivateKey) AsAgentKeys(sshCert *ssh.Certificate) []agent.AddedKey
 		agents = append(agents, agent.AddedKey{
 			PrivateKey:       r.PrivateKey,
 			Certificate:      nil,
-			Comment:          comment,
+			Comment:          comment.String(),
 			LifetimeSecs:     0,
 			ConfirmBeforeUse: false,
 		})

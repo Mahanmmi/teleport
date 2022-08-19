@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"encoding/pem"
+	"fmt"
 	"os"
 
 	"github.com/gravitational/trace"
@@ -138,4 +139,12 @@ func GetRSAPrivateKeyPEM(k PrivateKey) ([]byte, error) {
 		return nil, trace.BadParameter("cannot get rsa key PEM for private key of type %T", k)
 	}
 	return k.PrivateKeyPEM(), nil
+}
+
+type agentKeyComment struct {
+	user string
+}
+
+func (a *agentKeyComment) String() string {
+	return fmt.Sprintf("teleprot:%s", a.user)
 }
